@@ -1,0 +1,11 @@
+# macOS
+.DS_Store
+
+# Xcode — per-user state, not shared
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+
+# Claude Code — machine-local permissions, not shared
+.claude/settings.local.json
