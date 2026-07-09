@@ -119,12 +119,17 @@ Each `Journey` holds a `theme: JourneyTheme`. Views read colors and image names 
 
 ## What's actually built today
 
-The current code is a prototype. Treat everything else in this document as a plan.
+> An earlier, separate prototype repo (`JourneyTest`) contained a `JourneyProgress` singleton, a step-driven `JourneyMapView`, and a `HealthKitManager` that summed raw samples (and triple-counted across sources). **None of that was carried over.** Do not treat it as a baseline; it is retired.
 
-- A single `JourneyProgress` SwiftData model, fetched as a de-facto singleton (`journeyProgresses.first`). **This is the singleton the doc says not to build** — it should become `Journey` + `JourneyProgress` when the multi-journey work lands.
-- `HealthKitManager` with one-time reads and background delivery.
-- A `JourneyMapView` with progress driven partly by a step count and partly by a unitless distance constant.
-- **Not built:** `Journey`, `Character`, `Waypoint`, `JourneyTheme`, `sourceDevice`, `isPremium`, App Group container, CloudKit compatibility, String Catalog, meters as the canonical unit.
+**KAN-6 (shipped)** built the data foundation everything else depends on:
+- `Journey` and `ProgressUpdate` SwiftData models (plus a minimal `Waypoint` to hold the relationship), CloudKit-compatible, in an **App Group** container (placeholder group ID — needs the real team prefix before device provisioning).
+- A `HealthKitManager` "distance provider": authorization request, a one-time cumulative statistics query on launch, and an `HKObserverQuery` with background delivery. HealthKit's no-data error is treated as a legitimate zero reading; unexpected errors (e.g. locked-device store) never touch the anchor.
+- The **delta-anchor** update applied to every active journey, serialized through a `@ModelActor` (`ProgressStore`) — all `Journey`/`ProgressUpdate` writes must go through it.
+- Meters as the canonical unit, UTC timestamps, `sourceDevice` tagging. The anchor is **monotonic** — never re-anchored downward.
+- A developer-only debug display (no journey UI, no themed art yet) with accessibility identifiers for automated testing.
+- Deferred from KAN-6: Watch-side HealthKit wiring; past-`startDate` journey backfill (journey creation doesn't exist yet); waypoint seeding beyond the Ember Spire table.
+
+`Character`, `JourneyTheme`, `isPremium` behavior, the String Catalog, and the real map UI remain **Decided, not built** and are out of scope for KAN-6.
 
 ## What NOT to worry about yet
 
@@ -150,6 +155,9 @@ All properties need inline default values and optional relationships to stay Clo
 - `id`, `name`, `assetName`, `descriptionText`
 
 **ProgressUpdate** (the delta-based anchor)
-- `lastProcessedDistance` — meters, one shared anchor across all active journeys
+- `anchorStartDate` (UTC) — the fixed reference date the cumulative query runs *from*. Set once when the anchor is created (first authorization). Not per-journey.
+- `lastProcessedDistance` — meters, the cumulative `distanceWalkingRunning` from `anchorStartDate` that has already been applied to journeys. One shared anchor across all active journeys.
 - `lastUpdated` (UTC)
 - `sourceDevice` (watch / phone / unknown)
+
+**Delta computation — get this right (the prototype's triple-count bug lived here):** compute the new cumulative total with an `HKStatisticsQuery` using `.cumulativeSum` over `[anchorStartDate, now]`, which de-duplicates overlapping samples from multiple sources (iPhone + Watch). **Never sum raw `HKQuantitySample`s** — that double/triple-counts when phone and watch both record. `delta = max(0, newCumulative − lastProcessedDistance)`. Add `delta` to each active, non-completed journey's `distanceAccumulated`. **`lastProcessedDistance` is monotonic — advance it only when `newCumulative > lastProcessedDistance`; never lower it.** This is fail-closed by design: revoked read access surfaces as zero data with *no error* (HealthKit hides read status for privacy), so a downward re-anchor would reset the anchor toward 0 and then re-credit all distance since `anchorStartDate` to every journey on the next real reading — a silent, unbounded double-credit. Holding the anchor means a transient dip yields `delta 0` with the anchor intact, and a genuine Health-side deletion merely under-credits future walking until the cumulative total re-exceeds the old anchor. That matches this doc's rule that edits/deletions must not drive progress backward (a real "adjustment" story is still `Open`); under-crediting is bounded and recoverable, double-crediting is neither. `lastUpdated`/`sourceDevice` may refresh on any successful numeric reading for liveness; on a query *error* (nil), touch nothing. The cumulative-sum predicate uses `options: []` (not `.strictStartDate`): the window start is fixed across queries so there is no delta drift, and including a boundary-straddling sample whole is preferred over `.strictStartDate` silently dropping its real post-anchor portion. A journey created with a past `startDate` needs a one-time backfill query from its own `startDate`; a journey created "now" starts at 0 and simply accrues future deltas.

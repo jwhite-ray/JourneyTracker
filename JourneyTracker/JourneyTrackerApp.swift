@@ -6,12 +6,17 @@
 //
 
 import SwiftUI
+import SwiftData
 
 @main
 struct JourneyTrackerApp: App {
+    @State private var health = HealthKitManager.shared
+
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            DebugView()
+                .environment(health)
         }
+        .modelContainer(SharedModelContainer.shared)
     }
 }
