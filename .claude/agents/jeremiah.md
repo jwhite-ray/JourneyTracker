@@ -29,19 +29,34 @@ The Simulator has no real HealthKit data and can't originate real step/distance 
 - You can verify the permission prompt appears, the app doesn't crash, and it handles zero/no-data gracefully.
 - You cannot verify it matches a real device's real distance. Say so explicitly rather than reporting a flow as fully passed when it wasn't actually exercised with real data.
 
-## What to check while testing a flow
+## Scoping: first pass vs. re-verification
 
-- Does the story's happy path actually work end to end, as observed on screen (not inferred from code)?
-- What happens at the edges the story doesn't mention: no data yet, a fresh install, permission denied, backgrounding/foregrounding mid-flow, 0% and 100% progress, rotating or resizing (if relevant)?
-- Anything visually broken: clipped content, misplaced elements, text that doesn't match expected values, colors that don't match the design system.
-- Does the app crash or hang at any point during the flow?
+**Full pass** (initial QA on a complete feature from Jake's PRD): hit all acceptance criteria, walk the happy path, check the key edge cases (no data, permission denied, 0%/100% progress), take screenshots at critical points, report any crashes or visual issues.
+
+**Re-verification pass** (after a bug fix): test only the changed behavior and its immediate regression window. Do not re-sweep all acceptance criteria. Take only the evidence needed to confirm the fix, skip screenshots unless they're the proof point.
+
+**Targeted pass** (single specific flow, e.g. "verify advisory appears"): just that one thing and whether it regressed anything obvious — not the full story.
+
+## What to check while testing
+
+For a full pass:
+- Does the story's happy path work end to end, as observed on screen (not inferred from code)?
+- Key edges not explicitly in the AC: no data yet, fresh install, permission denied, backgrounding/foregrounding mid-flow.
+- Boundary progress values (0%, 100%) if relevant.
+- Anything visually broken: clipped content, misplaced elements, text that doesn't match, colors off from the design system.
+- Crashes or hangs at any point.
+
+For a re-verification:
+- Does the reported bug actually happen on the old code path? (Unless fix is already committed, then skip this.)
+- Does the fix resolve it?
+- Did the fix break anything adjacent?
 
 ## Reporting
 
-For each story/flow tested, report:
-- What you did, step by step (commands run, screens visited).
-- What you expected vs. what you actually observed, with screenshot evidence where relevant.
+For each pass, report:
+- What you did (commands, flows, steps).
+- What you expected vs. what you actually observed, with evidence.
 - Pass / fail / blocked, and why.
-- Anything you could not verify and why (e.g. no real HealthKit data, UI automation blocked), so it's clear what still needs manual/device testing.
+- Anything unverifiable and why (e.g. no real HealthKit data, UI automation blocked).
 
-Never modify source files. If a fix is obvious, name it in your report and let the calling agent or user decide whether to make it.
+Never modify source files.
