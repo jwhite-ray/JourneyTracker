@@ -61,11 +61,11 @@ Claude (the main session, not subagents) owns all Jira updates via the connected
 
 ### Lanes and transitions
 
-These are the board's **actual** status names and transition IDs, verified against the API. The first lane is literally spelled `Backlong` — a typo in the board config, not here. Use the exact names; don't guess.
+These are the board's **actual** status names and transition IDs, verified against the API. Use the exact names; don't guess.
 
 | Lane (status name) | Status ID | Transition ID | Owned by |
 |---|---|---|---|
-| `Backlong` (i.e. Backlog) | 10004 | 11 | — |
+| `Backlog` | 10004 | 11 | — |
 | `PRD in progress` | 10008 | 2 | Collin, then Jake |
 | `Design Review` | 10009 | 3 | Jeff (UI features only) |
 | `In Development` | 10005 | 21 | Dan |
@@ -75,7 +75,7 @@ These are the board's **actual** status names and transition IDs, verified again
 
 The seven lanes map one-to-one onto the pipeline. Design Review applies only to features with UI changes; skip it otherwise.
 
-- When a new feature is kicked off: create a ticket in `Backlong` with the user's request as the description, then move it to `PRD in progress` when Collin starts.
+- When a new feature is kicked off: create a ticket in `Backlog` with the user's request as the description, then move it to `PRD in progress` when Collin starts.
 - At each pipeline handoff, move the ticket to the matching lane and post the completing agent's summary as a comment (Collin's user story, Jake's PRD, Jeff's chosen mockup direction, Dan's implementation summary, Rooster's findings, Jeremiah's test results).
 - If Rooster or Jeremiah finds issues requiring rework, move the ticket back to `In Development` and comment why.
 - Move to `Done` only after Jeremiah's verification passes and the work is committed.
