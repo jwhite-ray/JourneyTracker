@@ -86,6 +86,7 @@ The seven lanes map one-to-one onto the pipeline. Design Review applies only to 
 - At each pipeline handoff, move the ticket to the matching lane and post the completing agent's summary as a comment (Collin's user story, Jake's PRD, Jeff's chosen mockup direction, Dan's implementation summary, Rooster's findings, Jeremiah's test results).
 - If Rooster or Jeremiah finds issues requiring rework, move the ticket back to `In Development` and comment why.
 - Move to `Done` only after Jeremiah's verification passes and the work is committed.
+- **Every feature's deliverable ends with a pull request.** Before moving the ticket to `Done`: push the feature branch, open a GitHub PR (repo `jwhite-ray/JourneyTracker`), and post the PR link in BOTH places — the final Jira comment on the ticket and the closing summary to the user in chat. A feature isn't delivered until the user has the PR link in hand.
 - For small fixes (light path): create the ticket directly in `In Development`, then move to `In Review` for Rooster and on to `Done` after the commit. Skip the earlier lanes.
 - Never mark a ticket Done without a commit hash referenced in a comment.
 - Issue types available: Epic, Story, Task, Feature, Bug, Subtask. Use Story for user-facing features, Bug for defects, Task for chores and docs.
