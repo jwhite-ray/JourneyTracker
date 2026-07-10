@@ -120,7 +120,7 @@ Their canonical distances live in the App Concept doc and ship as journey data �
 
 **Progress bar** — h22 · border 3 ink · radius 999 · fill `accent/primary` + hatch. Label reads `342 / 1,800 mi`.
 
-**Buttons** — radius 12 · border 3 · primary gets a 4px hard drop shadow. Press state: translate down 4pt, shadow to 0. Labels: "Start Journey," "View Map."
+**Buttons** — radius 12 · border 3 · fill `journey.theme.accentColorToken` + crisp 3pt ink stroke, no shadow (KAN-8 — the hard drop shadow read as a doubled border at button size). Press state: translate down 2pt, no shadow to collapse. Labels: "Start Journey," "View Map."
 
 **Milestone badges** — earned: `accent/reward` border. Locked: dashed border, 60% opacity.
 
