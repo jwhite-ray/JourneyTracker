@@ -174,6 +174,27 @@ enum SeedData {
             }
         }
 
+        // MARK: - Theme token backfill (one-time, self-limiting)
+        //
+        // Installs seeded BEFORE JourneyTheme fields existed have the themed
+        // journeys at empty `backgroundImageName` (and default accent/path).
+        // Backfill the design tokens for those, matched by name. Guarded on
+        // `backgroundImageName.isEmpty`, so it is a no-op once applied and never
+        // touches a journey that already carries a theme. "Around the World"
+        // stays intentionally neutral (empty image names) and is NOT listed
+        // here, so it is never backfilled.
+        let themeBackfill: [String: (bg: String, marker: String, accent: String, path: String)] = [
+            emberSpireName: ("ember_spire_bg", "marker_wren", "accent/primary", "ink"),
+            firstJourneyName: ("first_journey_bg", "marker_wren", "accent/secondary", "ink"),
+        ]
+        for journey in existingJourneys where journey.backgroundImageName.isEmpty {
+            guard let theme = themeBackfill[journey.name] else { continue }
+            journey.backgroundImageName = theme.bg
+            journey.markerImageName = theme.marker
+            journey.accentColorToken = theme.accent
+            journey.pathColorToken = theme.path
+        }
+
         // MARK: - Shared delta anchor — independent existence guard
         //
         // On a normal fresh install it shares `now` with the journeys above, so
