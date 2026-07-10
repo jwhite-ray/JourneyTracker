@@ -31,10 +31,17 @@ Nobody writes outside their column. Collin and Rooster and Jeremiah never edit f
 ## For new features (not small fixes)
 
 1. **Collin** drafts a user story and acceptance criteria from the user's perspective.
+   - **→ PAUSE: user reviews and approves Collin's story.** Do not proceed to Jake until approved.
+
 2. **Jake** reviews Collin's draft against the App Concept doc, questions assumptions, and finalizes a combined PRD.
+
 3. If the feature involves new or changed UI: **Jeff** proposes 2–3 SwiftUI Preview mockup variants based on Jake's PRD. **The user picks the direction** — not Jeff, not the main session.
+   - **→ PAUSE: user reviews PRD + mockups and approves the chosen direction.** Do not proceed to Dan until approved.
+
 4. **Dan** implements the real feature from the finalized PRD and the chosen mockup, then deletes the rejected mockup variants.
+
 5. **Rooster** reviews the implementation for bugs, edge cases, and quality — read-only, reports findings, never edits.
+
 6. **Jeremiah** verifies the feature in the Simulator from a real user's perspective.
 
 ## For small fixes and tweaks
