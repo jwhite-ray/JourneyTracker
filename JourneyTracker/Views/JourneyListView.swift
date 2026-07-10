@@ -60,13 +60,14 @@ private struct JourneyCard: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
                 .background {
-                    // Shadow lives on the background shape only, so the §08 hard
-                    // drop shadow never ghosts the label text.
+                    // No drop shadow here: at button size the hard drop shadow
+                    // pokes out below the stroke and reads as a doubled border.
+                    // Design System §07 now specifies buttons as fill + crisp
+                    // ink stroke, no shadow (KAN-8).
                     RoundedRectangle(cornerRadius: 12)
                         .fill(Color(token: journey.theme.accentColorToken))
                         .overlay(RoundedRectangle(cornerRadius: 12)
                             .stroke(Color(token: DesignToken.ink), lineWidth: 3))
-                        .shadow(color: Color(token: DesignToken.ink), radius: 0, x: 0, y: 4)
                 }
                 .accessibilityIdentifier("list.viewMapButton.\(journey.name)")
         }
