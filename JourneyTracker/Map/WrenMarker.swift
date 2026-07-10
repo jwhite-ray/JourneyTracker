@@ -41,9 +41,13 @@ private struct Faceted<S: Shape>: View {
     var base: Color
     var body: some View {
         ZStack {
+            // §04 recipe: base mid-tone, a +10% L highlight facet clipped
+            // top-left and a −12% L shadow facet clipped bottom-right — both
+            // DERIVED from `base` (Color.facetHighlight/facetShadow), so a
+            // re-themed base carries through. No literal colors here.
             shape.fill(base)
-            FacetPatch(topLeading: true).fill(Color.white.opacity(0.16)).clipShape(shape)
-            FacetPatch(topLeading: false).fill(Color.black.opacity(0.16)).clipShape(shape)
+            FacetPatch(topLeading: true).fill(Color.facetHighlight(of: base)).clipShape(shape)
+            FacetPatch(topLeading: false).fill(Color.facetShadow(of: base)).clipShape(shape)
         }
     }
 }

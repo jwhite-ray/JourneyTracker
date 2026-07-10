@@ -90,10 +90,24 @@ enum MarkerPositionCalculator {
         let sorted = waypoints.sorted { $0.order < $1.order }
         var assignedNext = false
 
+        // Defensive: if distance has reached every waypoint but the journey is
+        // NOT completed (possible for a future journey whose final waypoint sits
+        // short of totalDistance — doesn't happen with today's seeded data,
+        // where the last waypoint distance equals totalDistance and the updater
+        // sets isCompleted in the same transaction), there would otherwise be no
+        // `.next` at all. In that case the FINAL waypoint is still the one being
+        // walked toward, so it takes `.next`. This keeps "exactly one .next"
+        // true without prematurely showing the completed treatment.
+        let allReached = sorted.allSatisfy { distanceAccumulated >= $0.distanceFromStart }
+        let forceFinalNext = allReached && !isCompleted
+
         return sorted.enumerated().map { index, waypoint in
             let isFinal = index == sorted.count - 1
             if isCompleted && isFinal {
                 return (waypoint, .completedFinal)
+            }
+            if forceFinalNext && isFinal {
+                return (waypoint, .next)
             }
             if distanceAccumulated >= waypoint.distanceFromStart {
                 return (waypoint, .reached)

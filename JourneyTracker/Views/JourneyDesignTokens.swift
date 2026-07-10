@@ -30,4 +30,34 @@ extension Color {
     init(token: String) {
         self.init(token, bundle: .main)
     }
+
+    /// The Design System §04 facet recipe, expressed as LIGHTNESS deltas of the
+    /// base color rather than translucent white/black scrims — so a re-themed
+    /// base carries through both facets instead of being washed toward
+    /// monochrome. The derivation lives here (the token indirection layer) so no
+    /// view spells a facet color inline.
+    ///
+    /// §04: highlight = base +10% L (clipped top-left), shadow = base −12% L
+    /// (clipped bottom-right). We resolve the base to HSB and shift brightness,
+    /// clamped to [0, 1]; no literal hex is introduced.
+    static func facetHighlight(of base: Color) -> Color { base.adjustingBrightness(by: 0.10) }
+    static func facetShadow(of base: Color) -> Color { base.adjustingBrightness(by: -0.12) }
+
+    /// Returns a copy with brightness shifted by `delta` on the 0...1 HSB scale
+    /// (standing in for the recipe's percentage-of-lightness), preserving hue,
+    /// saturation, and alpha. Resolved against the current trait environment so
+    /// it tracks light / Deepdark.
+    private func adjustingBrightness(by delta: CGFloat) -> Color {
+        #if canImport(UIKit)
+        var hue: CGFloat = 0, saturation: CGFloat = 0, brightness: CGFloat = 0, alpha: CGFloat = 0
+        let ui = UIColor(self)
+        guard ui.getHue(&hue, saturation: &saturation, brightness: &brightness, alpha: &alpha) else {
+            return self
+        }
+        let shifted = min(max(brightness + delta, 0), 1)
+        return Color(hue: hue, saturation: saturation, brightness: shifted, opacity: alpha)
+        #else
+        return self
+        #endif
+    }
 }
