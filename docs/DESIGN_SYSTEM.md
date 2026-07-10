@@ -1,4 +1,4 @@
-# JourneyTracker — Design System v1.1
+# JourneyTracker — Design System v1.2
 
 **Status:** living document · owned by Jeff (design) · iOS · SwiftUI
 **Scope:** this document passes **style only** — color, type, shape, layout, and the character rig. It does not define behavior, data models, units, or progress math. Those live in `docs/JourneyTracker_App_Concept.md`, which wins on any such question.
@@ -6,6 +6,8 @@
 Every step you walk carries a wayfarer closer to the summit along the 1,800-mile road to Ember Spire. Faceted fantasy figures, parchment world, no gradients on characters — form comes from flat color facets.
 
 > **v1.1 change log.** All proper nouns are now original (see the App Concept doc's naming section — no real-world IP). The v1.0 progress formula (`steps × stride`) has been **removed**: it specified behavior, which is out of this document's scope, and it contradicted the App Concept doc. Progress is driven by HealthKit `distanceWalkingRunning`.
+
+> **v1.2 change log.** Added §07 "Waypoint & marker states" — the shared reached/next/upcoming/completed token language for journey maps, factored out of the three KAN-7 mockup variants in `Mockups/` so it's documented once regardless of which pin/badge shape the team picks.
 
 ---
 
@@ -123,6 +125,17 @@ Their canonical distances live in the App Concept doc and ship as journey data �
 **Milestone badges** — earned: `accent/reward` border. Locked: dashed border, 60% opacity.
 
 **Stat card** — radius 14 · border 2 · Cinzel numerals, Nunito labels. Eyebrow "TODAY," a step numeral, and a caption pairing distance with share-of-journey.
+
+**Waypoint & marker states (KAN-7)** — the token/opacity language a journey map uses to tell reached from upcoming, regardless of whether a given screen renders waypoints as pins, badges, or dots. Pin/badge *shape* is still open pending the KAN-7 mockup direction; this table is the part that's shared across all of them:
+
+| State | Fill | Stroke | Opacity | Notes |
+|---|---|---|---|---|
+| Reached / passed | `journey.theme.accentColorToken` | 3pt ink (2pt if a smaller badge) | 100% | Optional small ink checkmark/glyph. |
+| Next (the single upcoming waypoint) | `journey.theme.accentColorToken`, or `accent/reward` for the badge/ring itself | 3pt ink + an `accent/reward` emphasis ring or larger scale | 100% | The only waypoint whose name label is always shown, not just on tap — there is ever exactly one "next." |
+| Further unreached | none (outline only) | 2pt ink, dashed | 60% | Same locked language as milestone badges (§07). No name label by default. |
+| Completed-journey final waypoint | `accent/reward` | 3pt ink | 100% | Marker (Wren) is parked here, posed "fresh" (raised brows, no forward lean) with an `accent/reward` ring or pixel glyph attached — must read as *stopped*, distinct from mid-route "determined"/"worn out" walking poses. |
+
+Marker position is always continuous distance-weighted interpolation between the two bracketing waypoints — never snapped to the nearer one. At 0% it sits on the first waypoint; at 100% (or `isCompleted`) it's pinned to the last.
 
 ---
 
