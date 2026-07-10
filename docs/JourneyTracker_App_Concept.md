@@ -67,6 +67,47 @@ The design system was originally authored with placeholder names from a well-kno
 
 These numbers live in journey *data* (a bundled JSON file or SwiftData records), never as Swift literals in view code. The table above is the source they're seeded from, not a second copy to keep in sync by hand.
 
+**Journey 3 — "First Journey"** (KAN-7 test fixture) · `totalDistance` = 10 mi (16,093.44 m) · fantasy
+
+A short, low-total journey seeded alongside the two starters so marker positioning and completion can be exercised without walking 1,800 miles. Waypoints at cumulative miles 1 / 3 / 7 / 9, plus start (0) and end (10). Original names, no real-world IP.
+
+| Order | Waypoint | Cumulative miles |
+|---|---|---|
+| 0 | Trailhead | 0 |
+| 1 | First Rest | 1 |
+| 2 | Willowbend | 3 |
+| 3 | Old Oak | 7 |
+| 4 | Lastlight Bridge | 9 |
+| 5 | Journey's End | 10 |
+
+**Waypoint map positions (KAN-7).** `positionX`/`positionY` are image-relative normalized coordinates (0…1, origin top-left). These were all `0` in the shipped seed; KAN-7 seeds real placeholder values so the marker interpolation and pin layout can be verified. Exact values are placeholder art (Jeff finalizes against real backgrounds later); the requirement is only that they are distinct, non-colliding, and roughly track `distanceFromStart` so segment interpolation looks natural.
+
+*The Road to Ember Spire:*
+
+| Order | Waypoint | positionX | positionY |
+|---|---|---|---|
+| 0 | Thistledown | 0.12 | 0.88 |
+| 1 | Crosswater | 0.28 | 0.78 |
+| 2 | Silvergate | 0.20 | 0.60 |
+| 3 | The Deepdelve | 0.40 | 0.52 |
+| 4 | Whisperwood | 0.58 | 0.55 |
+| 5 | The Windmark | 0.52 | 0.38 |
+| 6 | Whitewatch | 0.70 | 0.24 |
+| 7 | Ember Spire | 0.82 | 0.12 |
+
+*First Journey:*
+
+| Order | Waypoint | positionX | positionY |
+|---|---|---|---|
+| 0 | Trailhead | 0.15 | 0.85 |
+| 1 | First Rest | 0.30 | 0.72 |
+| 2 | Willowbend | 0.45 | 0.60 |
+| 3 | Old Oak | 0.60 | 0.42 |
+| 4 | Lastlight Bridge | 0.75 | 0.28 |
+| 5 | Journey's End | 0.88 | 0.14 |
+
+*Around the World* (real-world, no waypoints) is the "journey with no waypoints" case the map must degrade gracefully against.
+
 **Character 1 — "Wren,"** a faceted wayfarer of the small-folk. Additional characters follow the same `Character` model.
 
 ## Future-proofing checklist
@@ -79,11 +120,12 @@ These numbers live in journey *data* (a bundled JSON file or SwiftData records),
 | **Progress metric** | Built (KAN-6) | — | Deriving distance from steps × stride | `distanceWalkingRunning` only; steps are a display stat. |
 | **Multiple journeys** | Built (KAN-6) | User runs more than one journey, switches between them, keeps a history of completed ones | "There is only one journey, ever" (a singleton) | Model `Journey` as a list, with `isActive` per journey. Costs nothing today, avoids a rewrite. |
 | **Multiple simultaneous journeys** | Built (KAN-6) | Yes — a user can run several journeys at once (e.g. Ember Spire and Around the World together) | Assuming only one journey can ever be "active" at a time | The delta-based update above: one shared "last processed distance" anchor, applied to every active journey's own accumulated total. |
+| **Fantasy map + marker** | Building (KAN-7) | Real-world MapKit routes later | "Progress = marker position" baked into progress logic | Map screen *reads* `journey.progress` / waypoint distances and interpolates marker position; it never owns or writes progress. |
 | **Journey types** | Decided | Fantasy illustrated path today; real-world MapKit routes later | Baking "progress = position on my custom image" into the core progress logic | Keep "distance accumulated" and "how that's visualized" as separate concerns. The map screen reads progress; it doesn't own it. |
 | **Activity data source** | Built (KAN-6) | Cycling, swimming, wheelchair distance, manual entry for offline days | Hardcoding "distance = HealthKit walking/running distance" deep in many places | Wrap HealthKit access in one small "distance provider." Everything else calls that, not HealthKit directly. |
 | **Units** | Built (KAN-6) | Users outside the US expecting km | Hardcoding "miles" into display strings | Store distance in **meters** internally, always. Format for display in one place based on locale. |
 | **Journey content** | Partially built (KAN-6: Ember Spire waypoints seeded; no remote/user content) | New journeys added without an app update; eventually user-created routes | Waypoints hardcoded as Swift literals scattered in view code | Define waypoints as structured data (a small JSON file or SwiftData records), even if bundled locally for now. |
-| **Visual styling / art** | Decided | Placeholder art now; commissioned art later; possibly a distinct art style per journey | Hardcoding image names, colors, or marker shapes directly inside view code | Global design tokens for surfaces/ink; a `JourneyTheme` for per-journey art and accents. See "Theme vs. tokens" below. |
+| **Visual styling / art** | Building (KAN-7) | Placeholder art now; commissioned art later; possibly a distinct art style per journey | Hardcoding image names, colors, or marker shapes directly inside view code | Global design tokens for surfaces/ink; a `JourneyTheme` for per-journey art and accents. See "Theme vs. tokens" below. |
 | **Distance accuracy & source device** | Built (KAN-6) | Showing users whether a reading came from Watch or iPhone | Treating the distance number as a single, unlabeled, always-accurate value | Tag stored progress updates with a `sourceDevice` field (watch / phone / unknown) now, even if unused in the UI today. |
 | **Character / avatar selection** | Decided | A handful of selectable characters at MVP; more later, possibly customizable or purchasable | Hardcoding the journey marker as one fixed icon | Define a `Character` type (name, asset reference, short description) as SwiftData records. Store the user's `selectedCharacter` reference. |
 | **Widget / Lock Screen support** | Built (KAN-6; placeholder App Group ID) | A home screen widget or Live Activity showing journey progress | Storing SwiftData in the default app-private container | Set up the SwiftData container in an **App Group** from day one. Costs nothing now; avoids a real data migration when a widget extension needs the same store. |
@@ -102,20 +144,22 @@ Two layers, and they are not the same thing:
 
 **Global design tokens** (`docs/DESIGN_SYSTEM.md`) define the app's shell: `bg/parchment`, `ink`, `surface/card`, `bg/dark`, plus the four accent hues. These are app-wide, live in the Asset Catalog as colorsets with light/Deepdark variants, and every screen uses them.
 
-**`JourneyTheme`** defines what varies *per journey*: art assets and which accents that journey leans on.
+**`JourneyTheme`** defines what varies *per journey*: art assets and which accents that journey leans on. **Building (KAN-7).**
+
+**Persistence shape (decided in KAN-7).** A `JourneyTheme` value type cannot be stored on the SwiftData model directly — `Color` is not CloudKit-persistable, and storing a literal `Color` would also violate the design-token rule. So the theme's four pieces live on `Journey` as **flat, CloudKit-safe stored `String` fields** (inline defaults, no unique constraints): `backgroundImageName`, `markerImageName`, `accentColorToken`, `pathColorToken`. Colors are stored as **design-token *names*** (`"accent/primary"`, `"ink"`), never as literal color values. A computed `journey.theme` assembles those strings into a lightweight value type for views:
 
 ```swift
 struct JourneyTheme {
-    let backgroundImageName: String   // e.g. "ember_spire_bg"
-    let markerImageName: String       // e.g. "marker_wren"
-    let accentColor: Color            // usually a design token, not a literal
-    let pathColor: Color
+    let backgroundImageName: String   // asset name, e.g. "ember_spire_bg"
+    let markerImageName: String       // asset name, e.g. "marker_wren"
+    let accentColorToken: String      // design-token NAME, e.g. "accent/primary"
+    let pathColorToken: String        // design-token NAME, e.g. "ink"
 }
 ```
 
-Each `Journey` holds a `theme: JourneyTheme`. Views read colors and image names from tokens or from `journey.theme` — never `Image("ember_spire_bg")` or `Color.red` typed inline. Swapping placeholder art for commissioned art later becomes: change the asset, update one string in one place.
+Views read `Image(journey.theme.backgroundImageName)`, `Color(journey.theme.accentColorToken)`, etc. — never `Image("ember_spire_bg")` or `Color.red` typed inline. Swapping placeholder art for commissioned art later becomes: change the asset, update one string in one place (in seed data, not view code).
 
-**Open question for Jake:** the design system notes that Deepdark mode can be triggered "inside cave milestones" — i.e. the journey's current waypoint drives appearance. That's a third thing, neither a global token nor a static per-journey theme. Decide whether `JourneyTheme` gains an optional per-waypoint override before anyone implements waypoint-driven appearance.
+**Open question for Jake — still Open, explicitly NOT resolved by KAN-7.** The design system notes Deepdark mode can be triggered "inside cave milestones" — i.e. the journey's current waypoint drives appearance. That's a third thing, neither a global token nor a static per-journey theme. KAN-7 ships `JourneyTheme` as a **static per-journey** theme only; it does not implement any waypoint-driven appearance. When that feature is picked up, it can be added as an *optional* per-waypoint override without disturbing KAN-7's shape (additive, not a rewrite) — so this remains a deliberately deferred question, not a KAN-7 blocker.
 
 ## What's actually built today
 
@@ -130,6 +174,13 @@ Each `Journey` holds a `theme: JourneyTheme`. Views read colors and image names 
 - Deferred from KAN-6: Watch-side HealthKit wiring; past-`startDate` journey backfill (journey creation doesn't exist yet); waypoint seeding beyond the Ember Spire table.
 
 `Character`, `JourneyTheme`, `isPremium` behavior, the String Catalog, and the real map UI remain **Decided, not built** and are out of scope for KAN-6.
+
+**KAN-7 (in progress)** builds the first real, themed UI on top of KAN-6's data foundation:
+- `JourneyTheme` as four flat CloudKit-safe `String` fields on `Journey` (see "Theme vs. design tokens") plus a computed `theme` accessor. Colors stored as token *names*, resolved at the view layer.
+- A journey-scoped fantasy **map view**: themed background, character marker interpolated along the waypoint polyline by real distance, waypoint states (reached / next / upcoming / completed). It only *reads* progress.
+- A minimal **journey list / entry point** to open the map from (no such screen exists today — only `DebugView`), so the map is always scoped to the journey it was opened from.
+- Seed data: real placeholder `positionX`/`positionY` for Ember Spire's waypoints (were all `0`), plus the **First Journey** fixture (10 mi, waypoints at miles 1/3/7/9) with its own waypoints and positions, seeded idempotently.
+- Not in KAN-7: waypoint-driven Deepdark appearance (still Open), real commissioned art, Watch-side map, cross-device seed de-duplication (deferred until CloudKit sync is actually enabled).
 
 ## What NOT to worry about yet
 
