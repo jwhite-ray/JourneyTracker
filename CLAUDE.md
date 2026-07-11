@@ -52,6 +52,8 @@ Skip the full pipeline — implement directly, then have Rooster review before c
 
 Jeff writes variants to `Mockups/`, which is **excluded from the app target**. They exist to be looked at in an Xcode Preview and then thrown away. Dan deletes the rejected variants as part of step 4; the chosen one gets hardened into a real view and its mockup file removed too. `Mockups/` should be empty between features.
 
+The mockup *source files* are disposable, but their rendered screenshots are not: at each Design Review gate the main session renders every variant/state to PNG (shown to the user inline + as an artifact page) and archives the renders to `docs/mockups/<TICKET>/` before the losing variants are deleted. Each ticket's Jira record links both the artifact page and the repo archive path. Jira attachments aren't possible with the connected tools — links only.
+
 ## Documentation maintenance
 
 When a feature introduces a new architectural decision, changes an existing one, or resolves something a doc flags as `Open`, update the doc as part of completing the feature — don't leave it stale. Jake owns the App Concept doc; Jeff owns the Design System. For rare light-path changes that touch architecture without Jake, the main session handles it and says so.
