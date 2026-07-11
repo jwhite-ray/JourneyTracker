@@ -3,10 +3,11 @@
 //  JourneyTracker
 //
 //  The "Ink Trail" journey map (KAN-7, Variant A). STRICTLY READ-ONLY over the
-//  persisted `Journey` it is opened with — it takes that exact journey and
+//  persisted `UserJourney` it is opened with — it takes that exact instance and
 //  never re-derives "the current journey", makes no HealthKit calls, and never
-//  writes Journey or ProgressUpdate. A fresh install or denied permission
-//  simply renders the stored 0% state.
+//  writes any model. Content (name, waypoints, theme, total) is read through the
+//  instance's `template`. A fresh install or denied permission simply renders
+//  the stored 0% state.
 //
 //  Parchment field, a dot-dash ink trail route in `theme.pathColorToken`,
 //  teardrop pins in `theme.accentColorToken`, and Wren positioned by
@@ -20,13 +21,13 @@
 import SwiftUI
 
 struct JourneyMapView: View {
-    /// The exact persisted journey this screen was opened from — never
+    /// The exact persisted instance this screen was opened from — never
     /// re-derived from "the current journey".
-    let journey: Journey
+    let journey: UserJourney
 
-    /// Waypoints sorted by order, resolved once.
+    /// Waypoints (content) sorted by order, read through the template.
     private var waypoints: [Waypoint] {
-        (journey.waypoints ?? []).sorted { $0.order < $1.order }
+        (journey.template?.waypoints ?? []).sorted { $0.order < $1.order }
     }
 
     private var states: [(waypoint: Waypoint, state: WaypointState)] {

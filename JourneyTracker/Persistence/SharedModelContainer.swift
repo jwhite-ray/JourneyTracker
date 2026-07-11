@@ -20,11 +20,9 @@ enum SharedModelContainer {
     /// it exists in the developer portal.
     static let appGroupID = "group.com.justinwhitehead.JourneyTracker.shared"
 
-    static let schema = Schema([
-        Journey.self,
-        Waypoint.self,
-        ProgressUpdate.self,
-    ])
+    /// The live (V2) schema — the catalog/instance split from KAN-10. The V1
+    /// shape and the V1 -> V2 migration live in JourneyMigration.swift.
+    static let schema = Schema(JourneySchemaV2.models)
 
     static let shared: ModelContainer = {
         let configuration: ModelConfiguration
@@ -43,7 +41,14 @@ enum SharedModelContainer {
         }
 
         do {
-            return try ModelContainer(for: schema, configurations: [configuration])
+            // The migration plan carries an existing V1 store (the shipped
+            // combined-Journey shape) forward to the KAN-10 split; a fresh
+            // install simply creates V2 directly.
+            return try ModelContainer(
+                for: schema,
+                migrationPlan: JourneyMigrationPlan.self,
+                configurations: [configuration]
+            )
         } catch {
             fatalError("Failed to create ModelContainer: \(error)")
         }

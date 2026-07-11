@@ -1,4 +1,4 @@
-# JourneyTracker — Design System v1.2
+# JourneyTracker — Design System v1.3
 
 **Status:** living document · owned by Jeff (design) · iOS · SwiftUI
 **Scope:** this document passes **style only** — color, type, shape, layout, and the character rig. It does not define behavior, data models, units, or progress math. Those live in `docs/JourneyTracker_App_Concept.md`, which wins on any such question.
@@ -8,6 +8,8 @@ Every step you walk carries a wayfarer closer to the summit along the 1,800-mile
 > **v1.1 change log.** All proper nouns are now original (see the App Concept doc's naming section — no real-world IP). The v1.0 progress formula (`steps × stride`) has been **removed**: it specified behavior, which is out of this document's scope, and it contradicted the App Concept doc. Progress is driven by HealthKit `distanceWalkingRunning`.
 
 > **v1.2 change log.** Added §07 "Waypoint & marker states" — the shared reached/next/upcoming/completed token language for journey maps, factored out of the three KAN-7 mockup variants in `Mockups/` so it's documented once regardless of which pin/badge shape the team picks.
+
+> **v1.3 change log.** Added §07 "Status stamp," "Kebab action menu," and "Destructive confirmation overlay" — the chosen KAN-10 lifecycle-status treatment (mockup Variant C, "Corner Stamp + Kebab Menu"), with one change from the mockup: the stamp renders straight, no rotation. Variants A ("text row") and B (their treatments) are dead; not documented.
 
 ---
 
@@ -136,6 +138,19 @@ Their canonical distances live in the App Concept doc and ship as journey data �
 | Completed-journey final waypoint | `accent/reward` | 3pt ink | 100% | Marker (Wren) is parked here, posed "fresh" (raised brows, no forward lean) with an `accent/reward` ring or pixel glyph attached — must read as *stopped*, distinct from mid-route "determined"/"worn out" walking poses. |
 
 Marker position is always continuous distance-weighted interpolation between the two bracketing waypoints — never snapped to the nearer one. At 0% it sits on the first waypoint; at 100% (or `isCompleted`) it's pinned to the last.
+
+**Status stamp (KAN-10).** A wax-seal-style badge pinned to a journey card's top-trailing corner, reporting lifecycle status (Active / Paused / Completed) without occupying the card's primary content flow. Renders **straight — no rotation or tilt**, unlike the original mockup, which tilted it for a wax-seal read; the chosen direction keeps the card calm. Shape: `RoundedRectangle`, radius 8, filled `surface/card`. Label: eyebrow-style caps ("ACTIVE" / "PAUSED" / "COMPLETE"), Nunito 700, 10pt, +0.08em kerning, `ink`. Padding 9 horizontal / 5 vertical. No drop shadow (consistent with §07 buttons/§08 — a shadow at this scale reads as a doubled border).
+
+Per-status stroke, 3pt unless noted:
+- **Active** — `accent/primary` stroke.
+- **Paused** — `ink` stroke at reduced opacity (the stamp itself is muted, not just its stroke color — treat the whole stamp at ~60% opacity to read as dormant against an Active card).
+- **Completed** — `accent/reward` stroke, 4pt (the one status that steps up stroke weight), plus the §05 pixel Emberstone glyph (6×6 grid, strict cells, no anti-aliasing) inline before the label. This is the only status with an icon — it's the celebratory one and should read as an award, not a fourth text label.
+
+**Kebab (•••) action menu (KAN-10).** Secondary lifecycle actions (Pause, Resume, Restart) collapse behind a single kebab button so the card surface stays to name, status, progress, and the primary "View Map" action. Kebab button: 32×32 square, radius 10, `surface/card` fill, 3pt `ink` stroke, centered `ellipsis` glyph.
+
+Tapping opens an anchored dropdown below the kebab whose leading edge aligns to the kebab's leading edge and extends trailing (x = kebab.minX), clamped to stay ≥12pt from the screen's trailing edge: `surface/card` fill, radius 12, 3pt `ink` stroke, fixed width 190. Rows are label + leading icon, Nunito 600, 13pt, `ink`, 12pt horizontal / 9pt vertical padding, separated by a 1pt `ink`-at-15%-opacity hairline (no divider after the last row). A row representing an action currently unavailable (e.g. "Resume" while another journey is active) renders its full row — icon, label, text — at 40% opacity rather than being hidden, so the option's existence is never a surprise.
+
+**Destructive confirmation overlay (KAN-10).** Reserved for irreversible, discard-language actions (e.g. Restart, which zeroes accumulated progress). Full-bleed dimmed scrim: `ink` at 45% opacity covering the whole screen/card context behind it. Centered card: max width 340, radius 16, `surface/card` fill, 3pt `ink` stroke, 20pt padding, content left-aligned. Header row pairs a warning glyph (SF Symbol `exclamationmark.triangle.fill` in `accent/alert`) with a serif title ("Restart *Journey Name*?"), Cinzel-register 700, 18pt, `ink`. Body copy states plainly what is lost and that it cannot be undone — Nunito 600, 14pt, `ink`. Footer is two buttons per the §07 button spec: **Cancel** (`surface/card` fill — visually recessive) and the destructive action (`accent/alert` fill, e.g. "Discard & Restart") — always in that left-to-right order, destructive action never defaulted/auto-focused.
 
 ---
 
