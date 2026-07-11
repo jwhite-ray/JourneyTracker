@@ -80,10 +80,78 @@ actor ProgressStore {
         case activeInstanceExists
         /// The identifier didn't resolve to a UserJourney on this context.
         case instanceNotFound
+        /// The identifier didn't resolve to a JourneyTemplate on this context
+        /// (KAN-11 `startJourney`).
+        case templateNotFound
+        /// A guard fetch itself threw, so startability/one-active can't be
+        /// proven. Fail CLOSED — we refuse the mutation rather than assume the
+        /// store is empty and risk creating a second active instance.
+        case guardCheckFailed
         /// The instance wasn't in the state this transition requires (e.g. a
         /// resume asked of an already-active instance). Guards against acting on
         /// a stale UI that raced another mutation.
         case wrongState
+        /// The template already has an `.active` OR a `.paused` instance, so it
+        /// is not startable from the store (KAN-11). Thrown by `startJourney`
+        /// when the startable predicate fails on the actor's own context — this
+        /// is the double-tap guard: the second of two rapid start calls sees the
+        /// first's freshly-created active instance and throws, so exactly one
+        /// instance is ever created. The UI swallows this.
+        case notStartable
+    }
+
+    // MARK: - Start flow (KAN-11)
+
+    /// Starts a NEW run of a template from the Available Journeys store: the
+    /// entry point that first creates a `UserJourney`. Resolves the template on
+    /// this actor's own context, RE-CHECKS the startable predicate there (no
+    /// `.active` and no `.paused` instance of that template — completed never
+    /// blocks), and only then inserts a fresh `.active` instance at
+    /// `distanceAccumulated = 0` / `startDate = now` and saves.
+    ///
+    /// Startability is re-checked HERE, not trusted from the UI: two rapid taps
+    /// enqueue two serialized calls; the first creates the instance and saves,
+    /// the second re-runs the predicate, now sees the active instance, and
+    /// throws `.notStartable`. Correctness does not depend on the button's
+    /// disabled state having propagated.
+    ///
+    /// A run created "now" starts at 0 and simply accrues future deltas — the
+    /// shared monotonic anchor keeps advancing regardless of lifecycle, and this
+    /// never backfills or touches `lastProcessedDistance`.
+    func startJourney(templateID: PersistentIdentifier) throws {
+        guard let template = modelContext.model(for: templateID) as? JourneyTemplate else {
+            throw LifecycleError.templateNotFound
+        }
+        try ensureStartable(template)
+        let fresh = UserJourney(
+            startDate: Date(),
+            distanceAccumulated: 0,
+            status: .active,
+            template: template
+        )
+        modelContext.insert(fresh)
+        try modelContext.save()
+    }
+
+    /// Throws `.notStartable` if `template` already has any `.active` OR
+    /// `.paused` instance (KAN-11 startable predicate). Completed instances do
+    /// not block. The enum-on-property filter is done in memory (SwiftData can't
+    /// reliably predicate on an enum raw value), mirroring `ensureNoActiveInstance`.
+    private func ensureStartable(_ template: JourneyTemplate) throws {
+        // Fail CLOSED: a throwing fetch must NOT read as "no instances" — that
+        // would let a second `.active` slip past the predicate. If we can't
+        // prove startability, refuse.
+        let all: [UserJourney]
+        do {
+            all = try modelContext.fetch(FetchDescriptor<UserJourney>())
+        } catch {
+            throw LifecycleError.guardCheckFailed
+        }
+        let blocked = all.contains {
+            $0.template?.persistentModelID == template.persistentModelID
+                && ($0.status == .active || $0.status == .paused)
+        }
+        if blocked { throw LifecycleError.notStartable }
     }
 
     /// Pauses an active instance. A frozen instance never accrues. Only valid
@@ -161,7 +229,14 @@ actor ProgressStore {
     /// predicate on an enum raw value).
     private func ensureNoActiveInstance(for template: JourneyTemplate?, excluding: UserJourney) throws {
         guard let template else { return }
-        let all = (try? modelContext.fetch(FetchDescriptor<UserJourney>())) ?? []
+        // Fail CLOSED (same reasoning as `ensureStartable`): a throwing fetch
+        // must not read as "no active instance" and let the invariant break.
+        let all: [UserJourney]
+        do {
+            all = try modelContext.fetch(FetchDescriptor<UserJourney>())
+        } catch {
+            throw LifecycleError.guardCheckFailed
+        }
         let conflict = all.contains {
             $0.persistentModelID != excluding.persistentModelID
                 && $0.status == .active

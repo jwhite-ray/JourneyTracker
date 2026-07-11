@@ -25,6 +25,9 @@ struct JourneyListView: View {
     @State private var openMenuID: PersistentIdentifier?
     /// The paused instance awaiting destructive restart confirmation.
     @State private var pendingPausedRestart: UserJourney?
+    /// Drives the shared push to Available Journeys (the store). Both the
+    /// toolbar `+` and the empty-state CTA set this — one destination (KAN-11).
+    @State private var showingStore = false
 
     /// One card per template: the highest-precedence instance for each. Active
     /// wins; else the most-recent paused; else the most-recent completed.
@@ -50,6 +53,24 @@ struct JourneyListView: View {
         content
             .background(Color(token: DesignToken.parchment))
             .navigationTitle("Your Journeys")
+            // The `+` entry point to Available Journeys — always visible,
+            // populated or empty (KAN-11).
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showingStore = true } label: {
+                        Image(systemName: "plus.circle")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundStyle(Color(token: DesignToken.ink))
+                    }
+                    .accessibilityIdentifier("list.addJourneyButton")
+                    .accessibilityLabel("Available Journeys")
+                }
+            }
+            // One shared destination, pushed onto the same NavigationStack that
+            // already pushes JourneyMapView. A successful start pops back here.
+            .navigationDestination(isPresented: $showingStore) {
+                AvailableJourneysView()
+            }
             .overlayPreferenceValue(KebabAnchorKey.self) { anchors in
                 menuOverlay(anchors: anchors)
             }
@@ -59,7 +80,7 @@ struct JourneyListView: View {
     @ViewBuilder
     private var content: some View {
         if cards.isEmpty {
-            EmptyJourneysState()
+            EmptyJourneysState(onStart: { showingStore = true })
         } else {
             ScrollView {
                 VStack(spacing: 16) {
@@ -501,8 +522,12 @@ private struct DimmedRestartConfirm: View {
 // MARK: - Empty state
 
 private struct EmptyJourneysState: View {
+    /// Opens Available Journeys — the same destination as the toolbar `+`, so an
+    /// empty "Your Journeys" is never a dead end (KAN-11, Variant A's design).
+    let onStart: () -> Void
+
     var body: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 12) {
             Spacer(minLength: 16)
 
             // Minimal "Wren is waiting" stand-in — the real §04 faceted rig is
@@ -510,8 +535,7 @@ private struct EmptyJourneysState: View {
             Circle()
                 .fill(Color(token: DesignToken.card))
                 .overlay(Circle().stroke(Color(token: DesignToken.ink), lineWidth: 2))
-                .frame(width: 30, height: 30)
-                .padding(.bottom, 4)
+                .frame(width: 34, height: 34)
 
             Text("No journeys yet")
                 .font(.system(size: 18, weight: .bold, design: .serif))
@@ -520,6 +544,15 @@ private struct EmptyJourneysState: View {
             Text("Wren is ready when you are.")
                 .font(.system(size: 13, weight: .semibold, design: .rounded))
                 .foregroundStyle(Color(token: DesignToken.ink).opacity(0.5))
+
+            // Primary CTA driving the shared store destination (§07 button —
+            // radius 12, 3pt ink stroke, accent/primary fill, no shadow).
+            Button(action: onStart) {
+                StampButtonLabel(title: "Start a Journey", fillToken: DesignToken.accentPrimary)
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 6)
+            .accessibilityIdentifier("list.emptyStateCTA")
 
             Spacer(minLength: 40)
         }
