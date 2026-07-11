@@ -80,6 +80,17 @@ A short, low-total journey seeded alongside the two starters so marker positioni
 | 4 | Lastlight Bridge | 9 |
 | 5 | Journey's End | 10 |
 
+**Journey 4 — "The Lantern Road"** (KAN-12) · `totalDistance` = 20 mi (32,186.88 m) · fantasy
+
+A mid-length journey with deliberately uneven waypoint spacing (3-mile and 14-mile segments) so interpolation is exercised across long gaps. Original names, no real-world IP. Accent: `accent/secondary`.
+
+| Order | Waypoint | Cumulative miles |
+|---|---|---|
+| 0 | Wickgate | 0 |
+| 1 | Foglow Bridge | 3 |
+| 2 | Palefire Hollow | 17 |
+| 3 | Lanternrest | 20 |
+
 **Waypoint map positions (KAN-7).** `positionX`/`positionY` are image-relative normalized coordinates (0…1, origin top-left). These were all `0` in the shipped seed; KAN-7 seeds real placeholder values so the marker interpolation and pin layout can be verified. Exact values are placeholder art (Jeff finalizes against real backgrounds later); the requirement is only that they are distinct, non-colliding, and roughly track `distanceFromStart` so segment interpolation looks natural.
 
 *The Road to Ember Spire:*
@@ -105,6 +116,15 @@ A short, low-total journey seeded alongside the two starters so marker positioni
 | 3 | Old Oak | 0.60 | 0.42 |
 | 4 | Lastlight Bridge | 0.75 | 0.28 |
 | 5 | Journey's End | 0.88 | 0.14 |
+
+*The Lantern Road:*
+
+| Order | Waypoint | positionX | positionY |
+|---|---|---|---|
+| 0 | Wickgate | 0.14 | 0.86 |
+| 1 | Foglow Bridge | 0.24 | 0.76 |
+| 2 | Palefire Hollow | 0.74 | 0.26 |
+| 3 | Lanternrest | 0.86 | 0.14 |
 
 *Around the World* (real-world, no waypoints) is the "journey with no waypoints" case the map must degrade gracefully against.
 
