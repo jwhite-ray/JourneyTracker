@@ -20,6 +20,10 @@ struct JourneyProgressBar: View {
     /// Leaf accessibility identifiers supplied by the caller.
     let barIdentifier: String
     let labelIdentifier: String
+    /// Optional stat rendered on the label row, trailing, top-aligned with the
+    /// mileage text (KAN-15: the card's miles-until stat sits here, snug under
+    /// the bar). Nil everywhere else — the map screen is unaffected.
+    var trailingAccessory: AnyView? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -35,10 +39,16 @@ struct JourneyProgressBar: View {
             .frame(height: 22)
             .accessibilityIdentifier(barIdentifier)
 
-            Text(label)
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundStyle(Color(token: DesignToken.ink))
-                .accessibilityIdentifier(labelIdentifier)
+            HStack(alignment: .top, spacing: 12) {
+                Text(label)
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color(token: DesignToken.ink))
+                    .accessibilityIdentifier(labelIdentifier)
+                if let trailingAccessory {
+                    Spacer(minLength: 12)
+                    trailingAccessory
+                }
+            }
         }
     }
 }
