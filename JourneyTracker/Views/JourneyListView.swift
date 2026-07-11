@@ -25,6 +25,9 @@ struct JourneyListView: View {
     @State private var openMenuID: PersistentIdentifier?
     /// The paused instance awaiting destructive restart confirmation.
     @State private var pendingPausedRestart: UserJourney?
+    /// The instance (any status) awaiting destructive delete confirmation
+    /// (KAN-13). Delete wipes ALL of its template's instances.
+    @State private var pendingDelete: UserJourney?
     /// Drives the shared push to Available Journeys (the store). Both the
     /// toolbar `+` and the empty-state CTA set this — one destination (KAN-11).
     @State private var showingStore = false
@@ -136,9 +139,11 @@ struct JourneyListView: View {
     @ViewBuilder
     private var confirmationOverlay: some View {
         if let journey = pendingPausedRestart {
-            DimmedRestartConfirm(
-                journeyName: journey.name,
-                progressText: DistanceFormatter.formattedMiles(journey.distanceAccumulated),
+            DimmedConfirm(
+                title: "Restart \(journey.name)?",
+                message: "This discards your current progress of \(DistanceFormatter.formattedMiles(journey.distanceAccumulated)) and starts over from zero. This can't be undone.",
+                destructiveLabel: "Discard & Restart",
+                destructiveIdentifier: "confirm.discardRestart",
                 onCancel: { pendingPausedRestart = nil },
                 onConfirm: {
                     let id = journey.persistentModelID
@@ -146,6 +151,32 @@ struct JourneyListView: View {
                     Task { try? await ProgressStore.shared.restartPaused(id) }
                 }
             )
+        } else if let journey = pendingDelete {
+            DimmedConfirm(
+                title: "Delete \(journey.name)?",
+                message: deleteMessage(for: journey),
+                destructiveLabel: "Delete",
+                destructiveIdentifier: "confirm.delete",
+                onCancel: { pendingDelete = nil },
+                onConfirm: {
+                    let templateID = journey.template?.persistentModelID
+                    pendingDelete = nil
+                    guard let templateID else { return }
+                    Task { try? await ProgressStore.shared.deleteJourney(templateID: templateID) }
+                }
+            )
+        }
+    }
+
+    /// Body copy for the delete confirmation, differing only for completed
+    /// (which has no live progress to discard — a completion record instead).
+    private func deleteMessage(for journey: UserJourney) -> String {
+        switch journey.status {
+        case .completed:
+            return "This deletes \(journey.name) and its completion record. The journey returns to Available Journeys to start fresh. This can't be undone."
+        case .active, .paused:
+            let progress = DistanceFormatter.formattedMiles(journey.distanceAccumulated)
+            return "This deletes \(journey.name) and discards your progress of \(progress). The journey returns to Available Journeys to start fresh. This can't be undone."
         }
     }
 
@@ -176,6 +207,10 @@ struct JourneyListView: View {
             case .active:
                 break // restart is not offered for an active instance
             }
+        case .delete:
+            // Destructive on every status — surface the dimmed confirmation
+            // first (KAN-13).
+            pendingDelete = journey
         }
     }
 
@@ -194,7 +229,7 @@ struct JourneyListView: View {
 // MARK: - Lifecycle action kinds
 
 enum LifecycleAction {
-    case pause, resume, restart
+    case pause, resume, restart, delete
 }
 
 // MARK: - Anchor preference for the kebab dropdown
@@ -405,13 +440,26 @@ private struct KebabDropdown: View {
         let systemImage: String
         let muted: Bool
         let identifier: String
+        /// Ink for the lifecycle actions; `DesignToken.alert` for the
+        /// destructive Delete row (the established destructive language — no new
+        /// visuals). Delete is NEVER muted.
+        var tintToken: String = DesignToken.ink
+    }
+
+    /// The destructive Delete row, present on EVERY status and placed LAST below
+    /// the lifecycle actions (KAN-13). Icon + label tinted `DesignToken.alert`.
+    private var deleteRow: Row {
+        Row(action: .delete, label: "Delete", systemImage: "trash",
+            muted: false, identifier: "list.action.delete.\(journey.name)",
+            tintToken: DesignToken.alert)
     }
 
     private var rows: [Row] {
         switch journey.status {
         case .active:
             return [Row(action: .pause, label: "Pause", systemImage: "pause.fill",
-                        muted: false, identifier: "list.action.pause.\(journey.name)")]
+                        muted: false, identifier: "list.action.pause.\(journey.name)"),
+                    deleteRow]
         case .paused:
             // §07: an unavailable action renders its FULL normal row (icon,
             // label) at 40% opacity — never a swapped label/icon — so the
@@ -425,10 +473,12 @@ private struct KebabDropdown: View {
                     identifier: "list.action.resume.\(journey.name)"),
                 Row(action: .restart, label: "Restart", systemImage: "arrow.counterclockwise",
                     muted: false, identifier: "list.action.restart.\(journey.name)"),
+                deleteRow,
             ]
         case .completed:
             return [Row(action: .restart, label: "Restart", systemImage: "arrow.counterclockwise",
-                        muted: false, identifier: "list.action.restart.\(journey.name)")]
+                        muted: false, identifier: "list.action.restart.\(journey.name)"),
+                    deleteRow]
         }
     }
 
@@ -445,7 +495,7 @@ private struct KebabDropdown: View {
                         Spacer(minLength: 0)
                     }
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
-                    .foregroundStyle(Color(token: DesignToken.ink).opacity(row.muted ? 0.4 : 1))
+                    .foregroundStyle(Color(token: row.tintToken).opacity(row.muted ? 0.4 : 1))
                     .padding(.horizontal, 12)
                     .padding(.vertical, 9)
                     .contentShape(Rectangle())
@@ -467,11 +517,21 @@ private struct KebabDropdown: View {
     }
 }
 
-// MARK: - Destructive restart confirmation (full dimmed overlay, §07)
+// MARK: - Destructive confirmation (full dimmed overlay, §07)
 
-private struct DimmedRestartConfirm: View {
-    let journeyName: String
-    let progressText: String
+/// One generalized dimmed-overlay confirmation, shared by the paused-restart
+/// (KAN-10) and delete (KAN-13) flows. Only the title, body, and destructive
+/// button's label + identifier vary — the layout, dim scrim, warning glyph,
+/// Cancel-first ordering, and alert-filled destructive button are identical, so
+/// the destructive language is defined in exactly one place. Cancel keeps the
+/// stable `confirm.cancel` identifier for whichever overlay is up; the caller
+/// supplies the destructive identifier (`confirm.discardRestart` for restart,
+/// `confirm.delete` for delete) so existing drivers keep working unchanged.
+private struct DimmedConfirm: View {
+    let title: String
+    let message: String
+    let destructiveLabel: String
+    let destructiveIdentifier: String
     let onCancel: () -> Void
     let onConfirm: () -> Void
 
@@ -485,12 +545,12 @@ private struct DimmedRestartConfirm: View {
                 HStack(spacing: 8) {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .foregroundStyle(Color(token: DesignToken.alert))
-                    Text("Restart \(journeyName)?")
+                    Text(title)
                         .font(.system(size: 18, weight: .bold, design: .serif))
                         .foregroundStyle(Color(token: DesignToken.ink))
                 }
 
-                Text("This discards your current progress of \(progressText) and starts over from zero. This can't be undone.")
+                Text(message)
                     .font(.system(size: 14, weight: .semibold, design: .rounded))
                     .foregroundStyle(Color(token: DesignToken.ink))
                     .fixedSize(horizontal: false, vertical: true)
@@ -503,10 +563,10 @@ private struct DimmedRestartConfirm: View {
                     .accessibilityIdentifier("confirm.cancel")
 
                     Button(action: onConfirm) {
-                        StampButtonLabel(title: "Discard & Restart", fillToken: DesignToken.alert)
+                        StampButtonLabel(title: destructiveLabel, fillToken: DesignToken.alert)
                     }
                     .buttonStyle(.plain)
-                    .accessibilityIdentifier("confirm.discardRestart")
+                    .accessibilityIdentifier(destructiveIdentifier)
                 }
             }
             .padding(20)

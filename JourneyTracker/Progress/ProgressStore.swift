@@ -24,7 +24,9 @@ import SwiftData
 
 /// WARNING: every write to `UserJourney`, `JourneyTemplate`, and `ProgressUpdate`
 /// must go through this actor's single context. That covers HealthKit delta
-/// application AND every KAN-10 lifecycle mutation (pause / resume / restart).
+/// application AND every KAN-10 lifecycle mutation (pause / resume / restart)
+/// AND the KAN-13 delete (which removes a template's instances only, never the
+/// template or the shared anchor).
 /// A future feature that mutates these from another context (e.g. a
 /// journey-creation UI, or flipping `status` on `mainContext`) would reintroduce
 /// the cross-context staleness/double-credit race this actor exists to prevent,
@@ -243,5 +245,46 @@ actor ProgressStore {
                 && $0.template?.persistentModelID == template.persistentModelID
         }
         if conflict { throw LifecycleError.activeInstanceExists }
+    }
+
+    // MARK: - Delete flow (KAN-13)
+
+    /// Deletes EVERY `UserJourney` instance of `templateID` — active, paused,
+    /// AND completed history — wiping the template's progress so it returns to
+    /// Available Journeys startable from zero. Deletes instances ONLY: the
+    /// `JourneyTemplate` (a catalog row) and the shared delta anchor are never
+    /// touched, so the template reappears in the store and the monotonic anchor
+    /// keeps advancing regardless.
+    ///
+    /// Resolves the template on this actor's own context first (throws
+    /// `.templateNotFound` if it can't). Then fetches all instances with the
+    /// same FAIL-CLOSED guard as `ensureStartable`: a throwing fetch must NOT
+    /// read as "no instances" and skip the wipe — we throw `.guardCheckFailed`
+    /// and abort BEFORE deleting anything, so a delete is never partial. The
+    /// in-memory filter (SwiftData can't reliably predicate on the relationship /
+    /// enum) matches instances whose `template?.persistentModelID == templateID`,
+    /// then deletes each in one save.
+    ///
+    /// An empty match set is a no-op success — mirroring `startJourney`'s
+    /// double-tap tolerance, a second delete (or a delete racing a wipe that
+    /// already landed) simply finds nothing and returns.
+    func deleteJourney(templateID: PersistentIdentifier) throws {
+        guard modelContext.model(for: templateID) is JourneyTemplate else {
+            throw LifecycleError.templateNotFound
+        }
+        // Fail CLOSED before any delete: prove the full instance set, or abort
+        // without partial-deleting.
+        let all: [UserJourney]
+        do {
+            all = try modelContext.fetch(FetchDescriptor<UserJourney>())
+        } catch {
+            throw LifecycleError.guardCheckFailed
+        }
+        let matches = all.filter { $0.template?.persistentModelID == templateID }
+        guard !matches.isEmpty else { return } // no-op success (double-tap race)
+        for instance in matches {
+            modelContext.delete(instance)
+        }
+        try modelContext.save()
     }
 }
