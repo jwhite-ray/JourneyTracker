@@ -65,6 +65,9 @@ enum ProgressUpdater {
         if newCumulative > anchor.lastProcessedDistance {
             // ONE delta, applied identically to EVERY active instance.
             for journey in activeJourneys(in: context) {
+                // Capture the pre-delta accumulated so the half-open crossing
+                // interval (old, new] can be evaluated after the increment/clamp.
+                let old = journey.distanceAccumulated
                 journey.distanceAccumulated += delta
 
                 // Auto-complete at 100%. An instance with no template can't have
@@ -76,7 +79,24 @@ enum ProgressUpdater {
                 if total > 0 && journey.distanceAccumulated >= total {
                     journey.distanceAccumulated = total
                     journey.status = .completed
+                    // Ruling 5: completedAt is the canonical finish date, set
+                    // here at auto-complete (covers zero-waypoint completions
+                    // that have no final-waypoint crossing to read).
+                    journey.completedAt = date
                 }
+
+                // Ruling 2 & 4: record a WaypointCrossing for every waypoint in
+                // the half-open interval (old, new] with distanceFromStart > 0
+                // (origin waypoints are never crossings). `new` includes any
+                // completion clamp above. Idempotency-guarded so the same
+                // waypoint is never double-recorded across deltas.
+                recordCrossings(
+                    for: journey,
+                    old: old,
+                    new: journey.distanceAccumulated,
+                    date: date,
+                    in: context
+                )
             }
             anchor.lastProcessedDistance = newCumulative
         }
@@ -87,5 +107,43 @@ enum ProgressUpdater {
 
         try context.save()
         return delta
+    }
+
+    /// Inserts a `WaypointCrossing` for each of `journey`'s waypoints crossed in
+    /// the half-open interval `(old, new]` with `distanceFromStart > 0` (Ruling 2
+    /// & 4). The low end is excluded so a waypoint sitting exactly at `old` (the
+    /// previous delta already recorded it) is never double-counted; the high end
+    /// is included so landing exactly on a waypoint records it. An idempotency
+    /// guard also skips any `waypointID` already recorded for this instance —
+    /// belt-and-braces against a re-applied delta.
+    ///
+    /// The crossing SNAPSHOTS the waypoint's identity (Ruling 1); it holds no
+    /// live Waypoint relationship. `crossedAt` is the reading's `date` — several
+    /// waypoints crossed by one delta legitimately share it.
+    nonisolated private static func recordCrossings(
+        for journey: UserJourney,
+        old: Double,
+        new: Double,
+        date: Date,
+        in context: ModelContext
+    ) {
+        guard let waypoints = journey.template?.waypoints, !waypoints.isEmpty else { return }
+        let alreadyRecorded = Set((journey.crossings ?? []).map { $0.waypointID })
+
+        for waypoint in waypoints where waypoint.distanceFromStart > 0 {
+            let d = waypoint.distanceFromStart
+            guard old < d, d <= new else { continue }
+            guard !alreadyRecorded.contains(waypoint.id) else { continue }
+
+            let crossing = WaypointCrossing(
+                crossedAt: date,
+                waypointID: waypoint.id,
+                order: waypoint.order,
+                name: waypoint.name,
+                distanceFromStart: waypoint.distanceFromStart,
+                journey: journey
+            )
+            context.insert(crossing)
+        }
     }
 }

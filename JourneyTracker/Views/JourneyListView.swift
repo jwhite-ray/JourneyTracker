@@ -253,6 +253,10 @@ private struct JourneyCard: View {
     let onToggleMenu: () -> Void
     let onAction: (LifecycleAction) -> Void
 
+    private var stats: JourneyStats {
+        JourneyStatsCalculator.stats(for: journey)
+    }
+
     var body: some View {
         ZStack(alignment: .topTrailing) {
             VStack(alignment: .leading, spacing: 10) {
@@ -272,6 +276,22 @@ private struct JourneyCard: View {
                     barIdentifier: "list.progressBar.\(journey.name)",
                     labelIdentifier: "list.distanceLabel.\(journey.name)"
                 )
+
+                // KAN-14: start date (left) + a right-aligned mini stat —
+                // "X mi until [next]" for an in-progress run, or the finish-date
+                // treatment for a completed one. Distance-derived values are
+                // frozen for a paused run (its distance is frozen). A zero-
+                // waypoint in-progress run omits the mini stat entirely.
+                HStack(alignment: .top) {
+                    Text("Started \(StatFormatter.date(journey.startDate))")
+                        .font(.system(size: 12, weight: .semibold, design: .rounded))
+                        .foregroundStyle(Color(token: DesignToken.ink).opacity(0.7))
+                        .accessibilityIdentifier("list.startDate.\(journey.name)")
+
+                    Spacer(minLength: 12)
+
+                    secondaryStat
+                }
 
                 HStack(spacing: 10) {
                     NavigationLink {
@@ -299,6 +319,42 @@ private struct JourneyCard: View {
                 .padding(.trailing, 14)
                 .accessibilityIdentifier("list.statusStamp.\(journey.name)")
         }
+    }
+
+    /// Right-aligned mini stat next to the start date. Completed → finish-date
+    /// treatment; in-progress with a next waypoint → "X mi until [next]";
+    /// otherwise (zero-waypoint or all reached) omitted.
+    @ViewBuilder
+    private var secondaryStat: some View {
+        if journey.isCompleted {
+            VStack(alignment: .trailing, spacing: 1) {
+                Text(stats.completedAt.map(StatFormatter.date) ?? "date not recorded")
+                    .font(.system(size: stats.completedAt == nil ? 11 : 14,
+                                  weight: stats.completedAt == nil ? .semibold : .bold,
+                                  design: .serif))
+                    .foregroundStyle(Color(token: DesignToken.ink))
+                    .multilineTextAlignment(.trailing)
+                Text("Finished")
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color(token: DesignToken.ink).opacity(0.7))
+            }
+            .frame(maxWidth: 140, alignment: .trailing)
+        } else if let next = stats.nextWaypoint {
+            VStack(alignment: .trailing, spacing: 1) {
+                Text(DistanceFormatter.formattedMiles(next.metersUntil))
+                    .font(.system(size: 15, weight: .bold, design: .serif))
+                    .foregroundStyle(Color(token: DesignToken.ink))
+                    .accessibilityIdentifier("list.milesUntil.\(journey.name)")
+                // Ruling 9: never truncate the waypoint name — wrap instead.
+                Text("mi until \(next.name)")
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color(token: DesignToken.ink).opacity(0.7))
+                    .multilineTextAlignment(.trailing)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: 140, alignment: .trailing)
+        }
+        // Zero-waypoint in-progress journeys: no mini stat.
     }
 }
 

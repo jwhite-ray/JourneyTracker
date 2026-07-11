@@ -164,6 +164,9 @@ actor ProgressStore {
         }
         guard journey.status == .active else { throw LifecycleError.wrongState }
         journey.status = .paused
+        // KAN-14 Ruling 6: stamp the pause moment so active-elapsed can exclude
+        // this window and days-on-journey / pace / projection freeze honestly.
+        journey.pausedAt = Date()
         try modelContext.save()
     }
 
@@ -177,6 +180,14 @@ actor ProgressStore {
         }
         guard journey.status == .paused else { throw LifecycleError.wrongState }
         try ensureNoActiveInstance(for: journey.template, excluding: journey)
+        // KAN-14 Ruling 6: close the open pause window into the accumulated
+        // total before clearing `pausedAt`, so the excluded paused time persists
+        // across resume. A legacy paused instance (pausedAt == nil, paused before
+        // KAN-14) simply has nothing to add — it self-heals from here forward.
+        if let pausedAt = journey.pausedAt {
+            journey.accumulatedPausedSeconds += max(0, Date().timeIntervalSince(pausedAt))
+        }
+        journey.pausedAt = nil
         journey.status = .active
         try modelContext.save()
     }

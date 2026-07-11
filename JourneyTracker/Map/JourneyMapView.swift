@@ -75,6 +75,8 @@ struct JourneyMapView: View {
                 )
 
                 if journey.isCompleted {
+                    // The KAN-7 completed banner is UNCHANGED and coexists with
+                    // the KAN-14 finish-date stat below (Ruling 5).
                     Text(completedCopy)
                         .font(.system(size: 13, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color(token: DesignToken.ink).opacity(0.75))
@@ -87,6 +89,13 @@ struct JourneyMapView: View {
                         .foregroundStyle(Color(token: DesignToken.ink).opacity(0.75))
                         .accessibilityIdentifier("map.noRouteNotice")
                 }
+
+                // KAN-14 journey stats — below the progress bar, scrolling with
+                // the screen. The map frame above keeps its shipped size.
+                JourneyStatsSection(
+                    stats: JourneyStatsCalculator.stats(for: journey),
+                    accentColorToken: journey.theme.accentColorToken
+                )
             }
             .padding(20)
         }
