@@ -31,6 +31,7 @@ enum SeedData {
     private static let emberSpireName = "The Road to Ember Spire"
     private static let firstJourneyName = "First Journey"
     private static let aroundTheWorldName = "Around the World"
+    private static let lanternRoadName = "The Lantern Road"
 
     /// A canonical template definition, seeded idempotently by name.
     private struct TemplateSeed {
@@ -83,6 +84,21 @@ enum SeedData {
                 ("Old Oak",           7,  0.60, 0.42),
                 ("Lastlight Bridge",  9,  0.75, 0.28),
                 ("Journey's End",     10, 0.88, 0.14),
+            ]
+        ),
+        TemplateSeed(
+            name: lanternRoadName,
+            type: .fantasy,
+            totalMiles: 20,
+            backgroundImageName: "lantern_road_bg",
+            markerImageName: "marker_wren",
+            accentColorToken: "accent/secondary",
+            pathColorToken: "ink",
+            waypoints: [
+                ("Wickgate",         0,  0.14, 0.86),
+                ("Foglow Bridge",    3,  0.24, 0.76),
+                ("Palefire Hollow",  17, 0.74, 0.26),
+                ("Lanternrest",      20, 0.86, 0.14),
             ]
         ),
         TemplateSeed(
