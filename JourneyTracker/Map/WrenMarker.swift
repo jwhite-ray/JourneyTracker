@@ -2,49 +2,65 @@
 //  WrenMarker.swift
 //  JourneyTracker
 //
-//  Wren, the wayfarer marker, drawn PROCEDURALLY in SwiftUI — no binary art is
-//  bundled yet (see KAN-7). The rig follows Design System §04's flat-facet
-//  language (base + top-left highlight + bottom-right shadow, no gradients, no
-//  mouth). Facet colors come from design tokens (char/cloak, char/skin, ink).
+//  Wren, the faceted wayfarer marker, drawn PROCEDURALLY in SwiftUI — no binary
+//  art is bundled yet (see KAN-7). This is the ACTUAL §04 rig, not a simplified
+//  figure: one layered vector stack on a 180×216 design box, scaled uniformly to
+//  the marker's on-map size, with fixed proportions and the flat-facet language
+//  (base mid-tone + top-left highlight + bottom-right shadow, no gradients, no
+//  mouth). Facet colors are DERIVED from the design tokens (char/cloak, char/skin,
+//  surface/card, ink) via Color.facetHighlight/facetShadow — never literal.
 //
-//  When real marker art ships, the journey's `theme.markerImageName` is the
-//  swap point — see JourneyMapView, which prefers a bundled image of that name
-//  and falls back to this procedural rig when none exists.
+//  When real marker art ships, the journey's `theme.markerImageName` is the swap
+//  point — see JourneyMapView, which prefers a bundled image of that name and
+//  falls back to this procedural rig when none exists.
 //
 
 import SwiftUI
 
+// MARK: - Facet primitives (§04)
+
 /// A shape's flat facet: a top-left highlight or a bottom-right shadow patch,
-/// clipped to the parent silhouette (§04). Never a gradient.
+/// clipped to the parent silhouette (§04). The §04 CSS `clip-path: polygon(0 0,
+/// 100% 0, 100% 45%, 0 70%)` becomes a four-point Path in local coordinates —
+/// but the literal recipe's highlight and its mirrored shadow OVERLAP, so their
+/// union covers the whole silhouette and the base mid-tone never shows. §04 wants
+/// three visible tones (base + highlight + shadow, "2–3 flat facets on top of a
+/// visible base"), so we pull both facet edges apart to leave a constant ~20% mid
+/// band: the highlight's bottom edge and the shadow's top edge run parallel
+/// (same −0.25h slope) with the base showing through between them at every x.
 private struct FacetPatch: Shape {
     var topLeading: Bool
     func path(in rect: CGRect) -> Path {
+        let h = rect.height
         var p = Path()
         if topLeading {
+            // Top-left highlight. Bottom edge: 0.58h (left) → 0.33h (right).
             p.move(to: CGPoint(x: rect.minX, y: rect.minY))
             p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
-            p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + rect.height * 0.45))
-            p.addLine(to: CGPoint(x: rect.minX, y: rect.minY + rect.height * 0.7))
+            p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + h * 0.33))
+            p.addLine(to: CGPoint(x: rect.minX, y: rect.minY + h * 0.58))
         } else {
+            // Bottom-right shadow. Top edge: 0.78h (left) → 0.53h (right), i.e.
+            // 0.20h below the highlight's bottom edge at every x — the mid band.
             p.move(to: CGPoint(x: rect.maxX, y: rect.maxY))
             p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
-            p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - rect.height * 0.45))
-            p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - rect.height * 0.7))
+            p.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - h * 0.22))
+            p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - h * 0.47))
         }
         p.closeSubpath()
         return p
     }
 }
 
+/// One faceted body part: base mid-tone fill, a +10% L highlight clipped
+/// top-left and a −12% L shadow clipped bottom-right, all clipped to the part's
+/// own rounded silhouette. Both facets are DERIVED from `base`, so a re-themed
+/// base carries through. No literal colors here (§04).
 private struct Faceted<S: Shape>: View {
     var shape: S
     var base: Color
     var body: some View {
         ZStack {
-            // §04 recipe: base mid-tone, a +10% L highlight facet clipped
-            // top-left and a −12% L shadow facet clipped bottom-right — both
-            // DERIVED from `base` (Color.facetHighlight/facetShadow), so a
-            // re-themed base carries through. No literal colors here.
             shape.fill(base)
             FacetPatch(topLeading: true).fill(Color.facetHighlight(of: base)).clipShape(shape)
             FacetPatch(topLeading: false).fill(Color.facetShadow(of: base)).clipShape(shape)
@@ -52,44 +68,179 @@ private struct Faceted<S: Shape>: View {
     }
 }
 
+/// The §04 hood: a 76×64 pentagon (peak up) drawn in its own rect's local space.
+private struct Pentagon: Shape {
+    func path(in rect: CGRect) -> Path {
+        var p = Path()
+        p.move(to: CGPoint(x: rect.midX, y: rect.minY))                               // apex
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + rect.height * 0.62))       // right shoulder
+        p.addLine(to: CGPoint(x: rect.maxX - rect.width * 0.10, y: rect.maxY))        // lower right
+        p.addLine(to: CGPoint(x: rect.minX + rect.width * 0.10, y: rect.maxY))        // lower left
+        p.addLine(to: CGPoint(x: rect.minX, y: rect.minY + rect.height * 0.62))       // left shoulder
+        p.closeSubpath()
+        return p
+    }
+}
+
+// MARK: - The rig, drawn at native 180×216 design-box coordinates
+
+/// Wren, laid out at the §04 design-box size. WrenMarker scales this down to the
+/// on-map marker size. All coordinates below are in the 180×216 box.
+private struct WrenRig: View {
+    /// true = parked / completed (fresh: raised brows, no lean, resting).
+    /// false = mid-route (determined: brows angled in-down, forward lean).
+    var resting: Bool
+
+    // Design box.
+    private let box = CGSize(width: 180, height: 216)
+
+    // Token-derived bases (facets come from these via the §04 helpers).
+    private var cloak: Color { Color(token: DesignToken.charCloak) }
+    private var skin: Color { Color(token: DesignToken.charSkin) }
+    private var ink: Color { Color(token: DesignToken.ink) }
+    private var eyeWhite: Color { Color(token: DesignToken.card) }
+
+    var body: some View {
+        ZStack {
+            // 0 · Ground contact shadow (stays on the ground — not leaned).
+            Ellipse()
+                .fill(ink.opacity(0.18))
+                .frame(width: 74, height: 18)
+                .position(x: 90, y: 200)
+
+            // Completion reward ring, parked "fresh" only (§07). Behind the
+            // figure so the rig reads in front of it.
+            if resting {
+                // Fits inside the 180-wide box (⌀172) so a map-edge clipShape
+                // won't slice it, and a 16pt box stroke reads ~3pt at marker
+                // scale — matching the §07 emphasis-ring weight.
+                Circle()
+                    .stroke(Color(token: DesignToken.reward), lineWidth: 16)
+                    .frame(width: 172, height: 172)
+                    .position(x: 90, y: 104)
+            }
+
+            // The character, leaned forward when walking (§04 "determined").
+            figure
+                .rotationEffect(.degrees(resting ? 0 : 6), anchor: .bottom)
+        }
+        .frame(width: box.width, height: box.height)
+    }
+
+    /// Construction order (back → front): feet → back arm → staff → pack →
+    /// body (cloak) → belt → ears → face circle → hood → eye whites → pupils →
+    /// eyebrows. (The ground shadow — step 0 of §04 — lives outside the lean.)
+    private var figure: some View {
+        ZStack {
+            // 1 · Feet (big, no visible hands = the small-folk read).
+            faceted(RoundedRectangle(cornerRadius: 11), base: skin,
+                    w: 24, h: 38, x: 76, y: 183)
+            faceted(RoundedRectangle(cornerRadius: 11), base: skin,
+                    w: 24, h: 38, x: 104, y: 183)
+
+            // 2 · Back arm (peeks out behind the cloak on the far side).
+            faceted(RoundedRectangle(cornerRadius: 13), base: cloak,
+                    w: 26, h: 56, x: 48, y: 128, rotation: 8)
+
+            // 3 · Staff (behind the body: pokes above the shoulder and below the
+            //     hem). char/cloak = neutral prop tone.
+            faceted(RoundedRectangle(cornerRadius: 4), base: cloak,
+                    w: 8, h: 150, x: 131, y: 116, rotation: -4)
+            faceted(Circle(), base: cloak, w: 15, h: 15, x: 134, y: 44)   // staff knob
+
+            // 4 · Pack (slung on the back, peeks above/left of the cloak).
+            faceted(RoundedRectangle(cornerRadius: 12), base: cloak,
+                    w: 34, h: 42, x: 56, y: 104)
+
+            // 5 · Body (cloak).
+            faceted(RoundedRectangle(cornerRadius: 20), base: cloak,
+                    w: 90, h: 68, x: 90, y: 138)
+
+            // 6 · Belt (thin ink band across the cloak). Subpixel at marker scale.
+            Capsule()
+                .fill(ink)
+                .frame(width: 90, height: 8)
+                .position(x: 90, y: 148)
+
+            // 7 · Ears (skin), at the sides of the head, below the hood rim.
+            faceted(Circle(), base: skin, w: 16, h: 16, x: 60, y: 86)
+            faceted(Circle(), base: skin, w: 16, h: 16, x: 120, y: 86)
+
+            // 8 · Face circle (head ⌀60).
+            faceted(Circle(), base: skin, w: 60, h: 60, x: 90, y: 82)
+
+            // 9 · Hood (76×64 pentagon), pulled down to the brow.
+            faceted(Pentagon(), base: cloak, w: 76, h: 64, x: 90, y: 38)
+
+            // 10 · Eye whites (⌀16).
+            Circle().fill(eyeWhite).frame(width: 16, height: 16).position(x: 78, y: 90)
+            Circle().fill(eyeWhite).frame(width: 16, height: 16).position(x: 102, y: 90)
+
+            // 11 · Pupils (⌀7, ink). Look slightly forward-down when determined.
+            let pupilDY: CGFloat = resting ? -1 : 2
+            Circle().fill(ink).frame(width: 7, height: 7).position(x: 79, y: 90 + pupilDY)
+            Circle().fill(ink).frame(width: 7, height: 7).position(x: 103, y: 90 + pupilDY)
+
+            // 12 · Eyebrows (ink) — emotion lives here, never a mouth (§01/§04).
+            //  Determined: angled in-down (\ /). Fresh: raised (/ \).
+            eyebrows
+        }
+        .frame(width: box.width, height: box.height)
+    }
+
+    private var eyebrows: some View {
+        // Determined: inner ends drop toward the nose. Fresh: raised, arched out.
+        let leftAngle: Double = resting ? -12 : 18
+        let rightAngle: Double = resting ? 12 : -18
+        let browY: CGFloat = resting ? 74 : 78
+        return Group {
+            Capsule().fill(ink).frame(width: 20, height: 5)
+                .rotationEffect(.degrees(leftAngle))
+                .position(x: 78, y: browY)
+            Capsule().fill(ink).frame(width: 20, height: 5)
+                .rotationEffect(.degrees(rightAngle))
+                .position(x: 102, y: browY)
+        }
+    }
+
+    /// Places a faceted part centered at (x, y) in the design box.
+    private func faceted<S: Shape>(_ shape: S, base: Color,
+                                   w: CGFloat, h: CGFloat,
+                                   x: CGFloat, y: CGFloat,
+                                   rotation: Double = 0) -> some View {
+        Faceted(shape: shape, base: base)
+            .frame(width: w, height: h)
+            .rotationEffect(.degrees(rotation))
+            .position(x: x, y: y)
+    }
+}
+
+// MARK: - The on-map marker
+
 struct WrenMarker: View {
     /// true = parked / completed (fresh, raised brows); false = walking
     /// (determined, forward lean). Drives the §04 emotional state.
     var resting: Bool
 
+    /// Uniform down-scale of the 180×216 rig to the on-map marker size. Keeps
+    /// the rig ~34pt wide, matching the bundled-image branch (32×40) in
+    /// JourneyMapView while preserving §04 proportions exactly.
+    private let scale: CGFloat = 0.19
+
     var body: some View {
-        ZStack {
-            // Contact shadow.
-            Ellipse().fill(Color(token: DesignToken.ink).opacity(0.18))
-                .frame(width: 26, height: 8).offset(y: 17)
-            // Body (cloak).
-            Faceted(shape: RoundedRectangle(cornerRadius: 6), base: Color(token: DesignToken.charCloak))
-                .frame(width: 20, height: 16).offset(y: 10)
-            // Hood.
-            Faceted(shape: Capsule(), base: Color(token: DesignToken.charCloak))
-                .frame(width: 18, height: 12).offset(y: -6)
-            // Face circle.
-            Faceted(shape: Circle(), base: Color(token: DesignToken.charSkin))
-                .frame(width: 16, height: 16)
-            // Pupils — no mouth (§01).
-            HStack(spacing: 4) {
-                Circle().fill(Color(token: DesignToken.ink)).frame(width: 2.5, height: 2.5)
-                Circle().fill(Color(token: DesignToken.ink)).frame(width: 2.5, height: 2.5)
-            }
-            // Eyebrows: raised (fresh) when resting, angled-in (determined) when walking.
-            HStack(spacing: 6) {
-                Capsule().fill(Color(token: DesignToken.ink)).frame(width: 4, height: 1.5)
-                    .rotationEffect(.degrees(resting ? 8 : -8))
-                Capsule().fill(Color(token: DesignToken.ink)).frame(width: 4, height: 1.5)
-                    .rotationEffect(.degrees(resting ? -8 : 8))
-            }
-            .offset(y: -4)
-            // Parked-at-the-summit reward ring.
-            if resting {
-                Circle()
-                    .stroke(Color(token: DesignToken.reward), lineWidth: 2)
-                    .frame(width: 30, height: 30)
-            }
-        }
+        WrenRig(resting: resting)
+            .frame(width: 180, height: 216)
+            .scaleEffect(scale, anchor: .center)
+            .frame(width: 180 * scale, height: 216 * scale)
     }
+}
+
+#Preview("Wren — poses") {
+    HStack(spacing: 40) {
+        WrenMarker(resting: false)   // determined / walking
+        WrenMarker(resting: true)    // fresh / completed
+    }
+    .scaleEffect(6)
+    .padding(120)
+    .background(Color(token: DesignToken.parchment))
 }
