@@ -127,14 +127,80 @@ enum JourneySchemaV1: VersionedSchema {
     }
 }
 
-/// The KAN-10 shape: catalog `JourneyTemplate` + instance `UserJourney`,
+/// The KAN-10 shape (V2): catalog `JourneyTemplate` + instance `UserJourney`,
 /// `Waypoint` keyed by `template`, and the unchanged `ProgressUpdate` anchor.
-/// These are the live top-level model types the app uses everywhere.
+///
+/// FROZEN. When V2 shipped it pointed at the live top-level types; KAN-14 (V3)
+/// then added fields to the live `UserJourney` and a new `WaypointCrossing`
+/// model, so V2 is snapshotted here as nested types describing exactly what is
+/// ON DISK in a V2 store. This is required for a V2 store to still be recognized
+/// as V2 (its recorded schema must match) — the same way V1 is frozen above.
+/// `ProgressUpdate` is unchanged across V2→V3 and stays the live type.
 enum JourneySchemaV2: VersionedSchema {
     static var versionIdentifier = Schema.Version(2, 0, 0)
 
     static var models: [any PersistentModel.Type] {
         [JourneyTemplate.self, UserJourney.self, Waypoint.self, ProgressUpdate.self]
+    }
+
+    @Model
+    final class JourneyTemplate {
+        var id: UUID = UUID()
+        var name: String = ""
+        var type: JourneyType = JourneyType.fantasy
+        var totalDistance: Double = 0
+        var isPremium: Bool = false
+        var isFeatured: Bool = false
+        var backgroundImageName: String = ""
+        var markerImageName: String = ""
+        var accentColorToken: String = "accent/primary"
+        var pathColorToken: String = "ink"
+
+        @Relationship(deleteRule: .cascade, inverse: \Waypoint.template)
+        var waypoints: [Waypoint]?
+
+        @Relationship(inverse: \UserJourney.template)
+        var instances: [UserJourney]?
+
+        init() {}
+    }
+
+    @Model
+    final class UserJourney {
+        var id: UUID = UUID()
+        var startDate: Date = Date()
+        var distanceAccumulated: Double = 0
+        var status: JourneyStatus = JourneyStatus.active
+        var template: JourneyTemplate?
+
+        init() {}
+    }
+
+    @Model
+    final class Waypoint {
+        var id: UUID = UUID()
+        var order: Int = 0
+        var positionX: Double = 0
+        var positionY: Double = 0
+        var distanceFromStart: Double = 0
+        var name: String = ""
+        var descriptionText: String = ""
+        var template: JourneyTemplate?
+
+        init() {}
+    }
+}
+
+/// The KAN-14 shape (V3): `UserJourney` gains `completedAt` / `pausedAt` /
+/// `accumulatedPausedSeconds` / a cascade `crossings` relationship, and a new
+/// `WaypointCrossing` model is added. Purely ADDITIVE over V2, so the V2→V3
+/// stage is lightweight. These are the live top-level model types the app uses
+/// everywhere (SharedModelContainer.schema points here).
+enum JourneySchemaV3: VersionedSchema {
+    static var versionIdentifier = Schema.Version(3, 0, 0)
+
+    static var models: [any PersistentModel.Type] {
+        [JourneyTemplate.self, UserJourney.self, Waypoint.self, WaypointCrossing.self, ProgressUpdate.self]
     }
 }
 
@@ -142,12 +208,22 @@ enum JourneySchemaV2: VersionedSchema {
 
 enum JourneyMigrationPlan: SchemaMigrationPlan {
     static var schemas: [any VersionedSchema.Type] {
-        [JourneySchemaV1.self, JourneySchemaV2.self]
+        [JourneySchemaV1.self, JourneySchemaV2.self, JourneySchemaV3.self]
     }
 
     static var stages: [MigrationStage] {
-        [migrateV1toV2]
+        [migrateV1toV2, migrateV2toV3]
     }
+
+    /// Additive lightweight (KAN-14): new optional/defaulted fields on
+    /// `UserJourney` plus the new `WaypointCrossing` model. No custom stage, no
+    /// stash — and the migration creates NO crossing records (Ruling 3:
+    /// pre-existing progress is forward-only; a reached-but-unrecorded waypoint
+    /// renders "date not recorded" rather than a fabricated crossing date).
+    static let migrateV2toV3 = MigrationStage.lightweight(
+        fromVersion: JourneySchemaV2.self,
+        toVersion: JourneySchemaV3.self
+    )
 
     static let migrateV1toV2 = MigrationStage.custom(
         fromVersion: JourneySchemaV1.self,

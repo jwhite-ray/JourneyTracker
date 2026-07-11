@@ -37,10 +37,30 @@ enum DistanceFormatter {
         return "\(milesNumber(accumulated)) / \(milesNumber(total)) mi"
     }
 
+    /// A pace rate, e.g. "4.2 mi/day", from a meters-per-day figure. Kept HERE
+    /// (not in StatFormatter) so every meters→miles division stays inside the
+    /// distance authority — the calculator hands over meters/day, views never
+    /// divide (App Concept doc, KAN-14 Ruling 8).
+    static func milesPerDay(_ metersPerDay: Double) -> String {
+        let miles = metersPerDay / metersPerMile
+        let number = paceNumberFormatter.string(from: NSNumber(value: miles)) ?? "0"
+        return "\(number) mi/day"
+    }
+
     private static let milesNumberFormatter: NumberFormatter = {
         let formatter = NumberFormatter()
         formatter.numberStyle = .decimal
         formatter.minimumFractionDigits = 0
+        formatter.maximumFractionDigits = 1
+        return formatter
+    }()
+
+    /// Pace always shows one decimal ("4.2 mi/day", "0.2 mi/day") so a slow pace
+    /// never rounds to a bare "0 mi/day".
+    private static let paceNumberFormatter: NumberFormatter = {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = 1
         formatter.maximumFractionDigits = 1
         return formatter
     }()

@@ -20,9 +20,11 @@ enum SharedModelContainer {
     /// it exists in the developer portal.
     static let appGroupID = "group.com.justinwhitehead.JourneyTracker.shared"
 
-    /// The live (V2) schema — the catalog/instance split from KAN-10. The V1
-    /// shape and the V1 -> V2 migration live in JourneyMigration.swift.
-    static let schema = Schema(JourneySchemaV2.models)
+    /// The live (V3) schema — KAN-14 adds `WaypointCrossing` and the additive
+    /// `UserJourney` fields on top of KAN-10's catalog/instance split. The V1/V2
+    /// shapes and the migration stages (custom V1→V2, lightweight V2→V3) live in
+    /// JourneyMigration.swift.
+    static let schema = Schema(JourneySchemaV3.models)
 
     static let shared: ModelContainer = {
         let configuration: ModelConfiguration
@@ -42,8 +44,9 @@ enum SharedModelContainer {
 
         do {
             // The migration plan carries an existing V1 store (the shipped
-            // combined-Journey shape) forward to the KAN-10 split; a fresh
-            // install simply creates V2 directly.
+            // combined-Journey shape) forward through the KAN-10 split (V2) and
+            // the KAN-14 additive stage (V3); a fresh install simply creates V3
+            // directly.
             return try ModelContainer(
                 for: schema,
                 migrationPlan: JourneyMigrationPlan.self,
