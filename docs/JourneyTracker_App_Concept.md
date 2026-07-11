@@ -110,9 +110,9 @@ A short, low-total journey seeded alongside the two starters so marker positioni
 
 **Character 1 — "Wren,"** a faceted wayfarer of the small-folk. Additional characters follow the same `Character` model.
 
-## Journey lifecycle & the catalog/instance split (KAN-10 — Decided, not built)
+## Journey lifecycle & the catalog/instance split (KAN-10 — Built, PR #6)
 
-**Decided (KAN-10), not yet built.** The shipped code still has a single combined `Journey` model with `isActive`/`isCompleted`/`isPremium` booleans. KAN-10 splits that one model into two and replaces the booleans with a lifecycle enum. Until Dan ships KAN-10, this section is the target shape, not the code.
+**Built (KAN-10, PR #6 on `feature/kan-10-journey-lifecycle` — complete; merge to `main` pending).** The single combined `Journey` model is gone: it is split into `JourneyTemplate` (catalog) + `UserJourney` (instance), and the `isActive`/`isCompleted` booleans are replaced by the `JourneyStatus` enum. Pause / Resume / Restart and the one-active-per-template invariant ship as serialized `ProgressStore` methods; "Your Journeys" renders one card per template with the KAN-10 status stamp + kebab menu. This section now describes shipped shape, not a target. (A store upgraded from the retired combined-`Journey` shape restores its instances once via the migration stash — see `JourneyMigration`/`SeedData`.)
 
 **Two models, not one.** A *journey* is really two different things that were conflated in the prototype:
 
@@ -145,7 +145,36 @@ enum JourneyStatus: String, Codable, CaseIterable {
 2. **Paused-restart discards.** Restarting a paused instance deletes it (destructive "discard" confirmation). Trophy/history value comes from completions, not abandoned attempts. Keeps `JourneyStatus` at three cases — no fourth terminal state, no archive flag.
 3. **All lifecycle mutations route through `ProgressStore`.** Pause / Resume / Restart (and any instance or status write) execute as methods on the `ProgressStore` `@ModelActor`, exactly like delta application — extending the existing "every `Journey`/`ProgressUpdate` write goes through this actor" invariant to the new instance model. Because the actor serializes on one `ModelContext`, an in-flight HealthKit delta and a restart can never interleave. **Invariant:** a delta processed *after* a restart lands only on the new active instance (the old one is no longer `active`); a delta processed *before* correctly credited the old instance. Restart never touches the shared anchor's `lastProcessedDistance` — the anchor keeps advancing monotonically regardless of lifecycle, so a fresh instance simply accrues from the next delta forward, never retroactively. Pause + resume works the same way: deltas during the paused window advance the anchor but are not credited to the paused instance, so resume continues from frozen progress.
 
-**Seeding after KAN-10.** Templates are *always* ensured (idempotent, by name). Instances are *never* auto-created on a fresh install — a new install has a fully-seeded catalog and an empty "Your Journeys". Creating instances is a user action (the `+` / store page is KAN-11, out of scope here).
+**Seeding after KAN-10.** Templates are *always* ensured (idempotent, by name). Instances are *never* auto-created on a fresh install — a new install has a fully-seeded catalog and an empty "Your Journeys". Creating instances is a user action — the `+` / **Available Journeys** store page (KAN-11); see "Available Journeys & the start flow" below.
+
+## Available Journeys (the store page) & the start flow (KAN-11 — Decided, not built)
+
+**Decided (KAN-11), not yet built.** KAN-10 seeds a full catalog but gives no way to start a run — a fresh install has an empty "Your Journeys". KAN-11 adds the entry point that first creates a `UserJourney`. Until Dan ships it, this section is the target shape, not the code.
+
+**Entry point.** A circled `+` lives in the "Your Journeys" navigation bar (trailing) at all times — populated or empty — and opens **Available Journeys**, the catalog/store page. The empty state gains a primary CTA that opens the same screen, so an empty "Your Journeys" is never a dead end. Both the toolbar `+` and the empty-state CTA drive one shared navigation destination.
+
+**Navigation shape — push, not sheet (Jake's ruling).** Available Journeys is *pushed* onto the existing "Your Journeys" `NavigationStack` (the same stack that already pushes `JourneyMapView`). On a successful start the screen pops back to "Your Journeys", which — because it reads instances via `@Query` — already shows the new active card with no manual refresh. Tradeoff: a sheet would read more as a discrete modal "add" task and give free swipe-to-dismiss, but push composes better with the future premium/detail drill-down, gives a native back button for "back out changes nothing", and makes the land-on-Your-Journeys-and-see-the-new-card return a clean pop rather than an explicit sheet dismiss.
+
+**What it lists.** Every `JourneyTemplate` in the catalog (three today), one row each, showing: `name`, total distance via `DistanceFormatter` (the single formatting authority, meters → miles), and a waypoint count **only when the template has waypoints** — "Around the World" has none, so the count is omitted entirely, never rendered as "0". A row may use the template's `theme.accentColorToken` for its accent (e.g. the Start button fill, per §07). The row reserves a structural slot for a future premium lock badge and `isFeatured` emphasis; today the list is plain and neither gates nor reorders anything.
+
+**Startable predicate (authoritative in `ProgressStore`).** A template is **startable** iff it has **no `.active` instance AND no `.paused` instance**. Completed instances do not block. Concretely:
+- **Startable** → the row offers an enabled "Start Journey" button (§07).
+- **Active instance exists** → the row is blocked and shows an "ACTIVE" badge (same status language as the KAN-10 stamp); no second active can be created.
+- **Paused instance exists** → the row is blocked and directs the user to resume or restart it on "Your Journeys" (a paused run is not a second startable slot).
+
+**Two start-flow rulings (KAN-11, Jake):**
+1. **Paused blocks store-start.** A template with a paused instance is *not* startable here. Starting a "new" run while a paused one exists would either strand the paused run behind one-card precedence or silently discard it; both belong to the explicit Resume/Restart affordances on "Your Journeys", not to a store tap. So the store never creates a run for a template that already has a paused instance — it points the user back to the card.
+2. **Completed-only allows store-start.** A template whose only instances are completed *is* startable here, and starting it is exactly the card's "Restart completed" — a fresh `UserJourney` at 0 m / `startDate = now` / `.active`, completion history preserved, no confirmation (nothing is lost). This keeps the store and the card consistent: the same non-destructive fresh-run behavior, reachable from two places.
+
+**Row-body vs. control affordance (Jake's ruling, KAN-11 Rooster finding 5).** The **row body is inert on every row** — startable and blocked alike — and is reserved for a future premium/detail drill-down; all actions live in explicit, labeled controls. On a **startable** row the *only* start affordance is the "Start Journey" pill (so a stray body tap can't cause an accidental start). On a **blocked** row (active or paused) the "manage this on Your Journeys" affordance is a **real, labeled `Button`/`NavigationLink`** — never a whole-row `onTapGesture` — because an invisible row-tap is undiscoverable to VoiceOver and inverts the affordance (an inert-looking body being tappable while the action-inviting row is dead). Activating it pops Available Journeys and returns to "Your Journeys", where that template's card and its kebab lifecycle actions (Pause / Resume / Restart) live — the store starts *new* runs; managing an existing run belongs to its card. Paused rows additionally carry a short directive caption. (Exact visuals — badge, caption, disabled-button styling, the blocked control's label — are Jeff's.)
+
+**Where the start mutation lives.** Starting a journey is a new serialized method on the `ProgressStore` `@ModelActor` — e.g. `startJourney(templateID: PersistentIdentifier)` — extending KAN-10 Ruling 3 (every instance/status write routes through this one actor). It resolves the template on the actor's own context, **re-checks the startable predicate there** (no active and no paused instance of that template — reusing/adjacent to `ensureNoActiveInstance`), and only then inserts a fresh `.active` `UserJourney` and saves. If the predicate fails it throws a new `LifecycleError` (e.g. `.notStartable`), which the UI swallows.
+
+**Double-tap safety is an actor guard, not just UI state.** Two rapid taps enqueue two `startJourney` calls; the actor serializes them on its one context. The first creates the active instance and saves; the second re-runs the predicate, now sees an active instance, and throws — so exactly one instance is ever created even if the button's disabled state hasn't propagated yet. The UI *also* flips the affordance immediately off the `@Query` update, but correctness does not depend on that.
+
+**Works with HealthKit never granted.** A started run sits at `distanceAccumulated = 0` and simply accrues future deltas whenever (if ever) Health data arrives — the shared monotonic anchor keeps advancing regardless. Starting never backfills; a run created "now" starts at 0 (see "The one assumption that matters most" and the delta-anchor rules).
+
+**Out of scope for KAN-11:** purchases / paywall, rendering premium-locked visuals beyond a structural slot, `isFeatured` behavior (the featured shelf), and the trophy case (superseded completed instances). The row leaves room for these; none is wired.
 
 ## Future-proofing checklist
 
@@ -155,7 +184,7 @@ enum JourneyStatus: String, Codable, CaseIterable {
 |---|---|---|---|---|
 | **Progress anchor** | Built (KAN-6) | Long-running journeys over weeks/months | Querying "today's distance" as the whole metric | Cumulative since `startDate`, always (see above). |
 | **Progress metric** | Built (KAN-6) | — | Deriving distance from steps × stride | `distanceWalkingRunning` only; steps are a display stat. |
-| **Multiple journeys** | Built (KAN-6); split Decided (KAN-10, not built) | User runs more than one journey, switches between them, keeps a history of completed ones | "There is only one journey, ever" (a singleton); *and* conflating catalog content with a user's run of it | Model as a list. KAN-10 splits this into `JourneyTemplate` (catalog) + `UserJourney` (instance) and replaces `isActive`/`isCompleted` with the `JourneyStatus` enum — see "Journey lifecycle & the catalog/instance split". |
+| **Multiple journeys** | Built (KAN-6); split Built (KAN-10, PR #6) | User runs more than one journey, switches between them, keeps a history of completed ones | "There is only one journey, ever" (a singleton); *and* conflating catalog content with a user's run of it | Model as a list. KAN-10 splits this into `JourneyTemplate` (catalog) + `UserJourney` (instance) and replaces `isActive`/`isCompleted` with the `JourneyStatus` enum — see "Journey lifecycle & the catalog/instance split". |
 | **Multiple simultaneous journeys** | Built (KAN-6) | Yes — a user can run several journeys at once (e.g. Ember Spire and Around the World together) | Assuming only one journey can ever be "active" at a time | The delta-based update above: one shared "last processed distance" anchor, applied to every active journey's own accumulated total. |
 | **Fantasy map + marker** | Built (KAN-7; §04 rig marker KAN-9) | Real-world MapKit routes later | "Progress = marker position" baked into progress logic | Map screen *reads* `journey.progress` / waypoint distances and interpolates marker position; it never owns or writes progress. |
 | **Journey types** | Decided | Fantasy illustrated path today; real-world MapKit routes later | Baking "progress = position on my custom image" into the core progress logic | Keep "distance accumulated" and "how that's visualized" as separate concerns. The map screen reads progress; it doesn't own it. |
@@ -169,8 +198,8 @@ enum JourneyStatus: String, Codable, CaseIterable {
 | **Localized text** | Decided | Non-English users | Hardcoding UI strings in view code | Use SwiftUI's String Catalog from the start. Same English text today, just organized for translation later. |
 | **Time zones** | Built (KAN-6) | User travels during a long-running journey | Comparing "since start" dates in local time, which drifts near midnight across time zones | Store journey start timestamps and progress timestamps in **UTC**; compare consistently regardless of the user's current time zone. |
 | **iPhone + Watch + iCloud sync** | Built (KAN-6: model constraints; sync itself not enabled) | Watch app needs the same progress; eventually multi-device | A SwiftData model that's hard to retroactively CloudKit-sync | Build the model **CloudKit-compatible from the start**: default values on every property, optional relationships, no unique constraints. Retrofitting this later is genuinely painful. |
-| **Monetization** | Built (KAN-6: field only); moves to template (KAN-10, not built) | Unlocking journey packs, one-time purchase or subscription | Assuming all journeys are always free/unlocked everywhere in the UI; *and* modeling premium as a lifecycle state | `isPremium` is a **catalog** attribute on `JourneyTemplate`, never a `JourneyStatus` case. When purchases ship, the lifecycle enum must not need to change. |
-| **Completion behavior** | Built (KAN-6); becomes `status` (KAN-10, not built) | What happens at 100%? | Assuming progress stops cleanly at 100% with no defined next state | Cap `progress` at 1.0; KAN-10 sets `status = .completed` (replacing `isCompleted`) and stops accumulating. Completed instances are **preserved as history** and can be restarted into a fresh instance. Looping is still a v2 decision. |
+| **Monetization** | Built (KAN-6: field only); moved to template (KAN-10, PR #6) | Unlocking journey packs, one-time purchase or subscription | Assuming all journeys are always free/unlocked everywhere in the UI; *and* modeling premium as a lifecycle state | `isPremium` is a **catalog** attribute on `JourneyTemplate`, never a `JourneyStatus` case. When purchases ship, the lifecycle enum must not need to change. |
+| **Completion behavior** | Built (KAN-6); now `status` (KAN-10, PR #6) | What happens at 100%? | Assuming progress stops cleanly at 100% with no defined next state | Cap `progress` at 1.0; KAN-10 sets `status = .completed` (replacing `isCompleted`) and stops accumulating. Completed instances are **preserved as history** and can be restarted into a fresh instance. Looping is still a v2 decision. |
 | **Notifications & milestones** | Built (KAN-6: fields only) | Notify when passing a named landmark | Waypoints as bare coordinates with no metadata | Give each waypoint a `name` and `description` now, even if unused today — costs nothing, enables notifications later without a model change. |
 | **Manual correction** | Open | HealthKit data is occasionally wrong, or a user bikes and doesn't want it counted | Treating HealthKit as the sole, unquestionable source of truth forever | Not needed for v1 — just don't design anything that would make an "adjustment" field impossible to add later (it won't). |
 | **Social / sharing** | Open | Friends, leaderboards, group journeys | No structural blocker — just don't assume it can't happen | Nothing to do now. Local-first data doesn't prevent adding this later. |
@@ -219,6 +248,14 @@ Views read `Image(journey.theme.backgroundImageName)`, `Color(journey.theme.acce
 - Seed data: real placeholder `positionX`/`positionY` for Ember Spire's waypoints (were all `0`), plus the **First Journey** fixture (10 mi, waypoints at miles 1/3/7/9) with its own waypoints and positions, seeded idempotently.
 - Not in KAN-7: waypoint-driven Deepdark appearance (still Open), real commissioned art, Watch-side map, cross-device seed de-duplication (deferred until CloudKit sync is actually enabled).
 
+**KAN-10 (built; PR #6 on `feature/kan-10-journey-lifecycle`, merge to `main` pending)** split the model and added the lifecycle:
+- `JourneyTemplate` (catalog content) + `UserJourney` (per-user instance) replace the combined `Journey`; `JourneyStatus` (active / paused / completed) replaces `isActive`/`isCompleted`. `Waypoint.journey` → `Waypoint.template`.
+- Pause / Resume / Restart-completed / Restart-paused ship as serialized `ProgressStore` methods enforcing the one-active-per-template invariant; a one-time migration stash restores instances from the retired shape.
+- "Your Journeys" renders one card per template (highest-precedence instance) with the §07 status stamp + kebab action menu + destructive restart confirmation. Instances are never auto-seeded — a fresh install has a full catalog and an empty list.
+- Not in KAN-10: the entry point that *creates* an instance (the `+` / Available Journeys store — KAN-11), the trophy case for superseded completions, purchase/premium gating.
+
+**KAN-11 (Decided, not built)** — the Available Journeys store page and the start flow that first creates a `UserJourney`. See "Available Journeys (the store page) & the start flow" above.
+
 ## What NOT to worry about yet
 
 To be precise about "database": a **local database is already part of the plan** — SwiftData (SQLite under the hood) runs entirely on the user's device and is the right home for journeys, characters, and progress data, with zero server involved. What to skip for now is a **backend/server database** — one running on the internet that many users' apps talk to over a network. That's only needed for cross-device sync beyond what iCloud offers for free, social features, or pushing new content without an app update. Journeys, characters, and progress all belong in SwiftData from day one; none of that requires a backend.
@@ -227,9 +264,9 @@ To be precise about "database": a **local database is already part of the plan**
 
 All properties need inline default values and optional relationships to stay CloudKit-compatible. Never name a type plain `Task` — it collides with Swift's concurrency type.
 
-> **KAN-10 splits `Journey` into a catalog `JourneyTemplate` and an instance `UserJourney`** (see "Journey lifecycle & the catalog/instance split"). The shipped code still has the single combined `Journey` below until Dan ships KAN-10; the split shape is shown after it.
+> **KAN-10 (PR #6) split `Journey` into a catalog `JourneyTemplate` and an instance `UserJourney`** (see "Journey lifecycle & the catalog/instance split"). This shipped; the combined `Journey` below is the retired pre-KAN-10 shape, kept only for migration reference. The split shape follows it.
 
-**Journey** (shipped shape, KAN-6/7 — superseded by the split below once KAN-10 ships)
+**Journey** (retired pre-KAN-10 shape, KAN-6/7 — superseded by the split below; kept for migration reference)
 - `id`, `name`, `type` (fantasy / realWorld)
 - `totalDistance` — meters
 - `distanceAccumulated` — meters
