@@ -54,7 +54,7 @@ struct JourneyStatsSection: View {
             )
 
             StatTile(
-                eyebrow: "DAYS ON JOURNEY",
+                eyebrow: timeOnJourneyEyebrow,
                 value: stats.daysOnJourneySeconds.map(StatFormatter.duration) ?? placeholderValue,
                 caption: stats.daysOnJourneySeconds == nil ? notEnoughDataCaption : nil,
                 identifier: "map.stat.daysOnJourney"
@@ -86,6 +86,17 @@ struct JourneyStatsSection: View {
     }
 
     private var placeholderValue: String { "—" }
+
+    /// KAN-15: the header names the unit the value actually shows — never
+    /// "DAYS ON JOURNEY" over an hours (or minutes) value.
+    private var timeOnJourneyEyebrow: String {
+        guard let seconds = stats.daysOnJourneySeconds else { return "DAYS ON JOURNEY" }
+        switch StatFormatter.durationUnit(seconds) {
+        case .days: return "DAYS ON JOURNEY"
+        case .hours: return "HOURS ON JOURNEY"
+        case .minutes: return "TIME ON JOURNEY"
+        }
+    }
     private var notEnoughDataCaption: String { "Not enough data yet" }
 
     // MARK: - Waypoints-reached timeline log

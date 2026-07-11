@@ -72,4 +72,21 @@ enum StatFormatter {
         let n = max(1, count)
         return "\(n) \(unit)\(n == 1 ? "" : "s")"
     }
+
+    /// The unit `duration(_:)` would display for this many seconds — so a
+    /// stat's header can name the unit it actually shows (KAN-15: never
+    /// "DAYS ON JOURNEY" over an hours value). Mirrors the banding above,
+    /// including the round-up carries.
+    enum DurationUnit { case minutes, hours, days }
+    static func durationUnit(_ seconds: Double) -> DurationUnit {
+        let s = max(0, seconds)
+        if s < 60 { return .minutes }
+        if s < 3_600 {
+            return Int((s / 60).rounded()) >= 60 ? .hours : .minutes
+        }
+        if s < 172_800 {
+            return Int((s / 3_600).rounded()) >= 48 ? .days : .hours
+        }
+        return .days
+    }
 }

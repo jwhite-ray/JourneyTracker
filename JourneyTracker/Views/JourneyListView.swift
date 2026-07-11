@@ -266,6 +266,11 @@ private struct JourneyCard: View {
                     .padding(.trailing, 70) // clear the corner stamp
                     .accessibilityIdentifier("list.journeyName.\(journey.name)")
 
+                // KAN-14/15: the mini stat ("X mi until [next]", or the
+                // finish-date treatment) rides the progress bar's label row,
+                // trailing, top-aligned with the total-miles text. Distance-
+                // derived values are frozen for a paused run; a zero-waypoint
+                // in-progress run has no mini stat.
                 JourneyProgressBar(
                     progress: journey.progress,
                     accentColorToken: journey.theme.accentColorToken,
@@ -274,24 +279,14 @@ private struct JourneyCard: View {
                         total: journey.totalDistance
                     ),
                     barIdentifier: "list.progressBar.\(journey.name)",
-                    labelIdentifier: "list.distanceLabel.\(journey.name)"
+                    labelIdentifier: "list.distanceLabel.\(journey.name)",
+                    trailingAccessory: AnyView(secondaryStat)
                 )
 
-                // KAN-14: start date (left) + a right-aligned mini stat —
-                // "X mi until [next]" for an in-progress run, or the finish-date
-                // treatment for a completed one. Distance-derived values are
-                // frozen for a paused run (its distance is frozen). A zero-
-                // waypoint in-progress run omits the mini stat entirely.
-                HStack(alignment: .top) {
-                    Text("Started \(StatFormatter.date(journey.startDate))")
-                        .font(.system(size: 12, weight: .semibold, design: .rounded))
-                        .foregroundStyle(Color(token: DesignToken.ink).opacity(0.7))
-                        .accessibilityIdentifier("list.startDate.\(journey.name)")
-
-                    Spacer(minLength: 12)
-
-                    secondaryStat
-                }
+                Text("Started \(StatFormatter.date(journey.startDate))")
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundStyle(Color(token: DesignToken.ink).opacity(0.7))
+                    .accessibilityIdentifier("list.startDate.\(journey.name)")
 
                 HStack(spacing: 10) {
                     NavigationLink {
