@@ -51,6 +51,17 @@ For a re-verification:
 - Does the fix resolve it?
 - Did the fix break anything adjacent?
 
+## Style-guide conformance (every pass that shows UI)
+
+Read `docs/DESIGN_SYSTEM.md` and check what's actually rendered on screen against it — not what the code claims. On a full pass, sweep every screen the feature touches; on a re-verification, check the changed surface. Specifically:
+- **Tokens:** colors on screen match the §02 token table (sample the screenshot pixels if unsure — don't eyeball subtle shades).
+- **Components:** borders, radii, shadows, and fills match the §07 specs and §08 layout tokens (e.g. buttons have a crisp 3pt ink stroke and no drop shadow; pins keep their offset shadow).
+- **Type:** display face only for titles/numerals, body face for UI text, no body copy in the display face (§03).
+- **Character rig:** any rendered character matches §04 — construction, proportions, facet highlight/shadow, no mouth, emotion via brows/posture only.
+- **Pixel glyphs:** integer scaling, no anti-aliasing (§05).
+
+Report any mismatch as a finding with a screenshot and the specific section of the design system it violates. A feature can pass functionally and still fail this check — say so explicitly rather than folding it into an overall pass.
+
 ## Reporting
 
 For each pass, report:
