@@ -24,12 +24,13 @@ enum ProgressUpdater {
         return (try? context.fetch(descriptor))?.first
     }
 
-    /// Every active, non-completed journey.
-    nonisolated static func activeJourneys(in context: ModelContext) -> [Journey] {
-        let descriptor = FetchDescriptor<Journey>(
-            predicate: #Predicate { $0.isActive && !$0.isCompleted }
-        )
-        return (try? context.fetch(descriptor)) ?? []
+    /// Every active instance. The status filter is applied IN MEMORY rather
+    /// than in a #Predicate: SwiftData can't reliably predicate on an enum
+    /// raw-value property, so we fetch all instances and filter. `.active` is
+    /// the only status that accrues, so paused/completed are excluded here.
+    nonisolated static func activeJourneys(in context: ModelContext) -> [UserJourney] {
+        let all = (try? context.fetch(FetchDescriptor<UserJourney>())) ?? []
+        return all.filter { $0.status == .active }
     }
 
     /// Apply a newly-measured cumulative distance (meters, from the anchor's
@@ -62,12 +63,19 @@ enum ProgressUpdater {
         // walked since anchorStartDate. Under-crediting is bounded and
         // recoverable; a downward re-anchor's double-credit is neither.
         if newCumulative > anchor.lastProcessedDistance {
-            // ONE delta, applied identically to EVERY active journey.
+            // ONE delta, applied identically to EVERY active instance.
             for journey in activeJourneys(in: context) {
                 journey.distanceAccumulated += delta
-                if journey.distanceAccumulated >= journey.totalDistance {
-                    journey.distanceAccumulated = journey.totalDistance
-                    journey.isCompleted = true
+
+                // Auto-complete at 100%. An instance with no template can't have
+                // a total to reach, so use +infinity to skip auto-completion for
+                // it (it simply keeps accruing until it gains a template). A
+                // non-positive total (missing/zero content) must NOT auto-flip
+                // to completed at zero distance, so require total > 0.
+                let total = journey.template?.totalDistance ?? .infinity
+                if total > 0 && journey.distanceAccumulated >= total {
+                    journey.distanceAccumulated = total
+                    journey.status = .completed
                 }
             }
             anchor.lastProcessedDistance = newCumulative

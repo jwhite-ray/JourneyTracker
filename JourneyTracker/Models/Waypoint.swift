@@ -5,8 +5,12 @@
 //  A named point along a journey. Positions and distances are DATA, seeded
 //  from the App Concept doc's waypoint table — never Swift literals in views.
 //
+//  KAN-10: waypoints are content, owned by the catalog JourneyTemplate (one
+//  set shared by every instance of that template), so the back-reference is
+//  `template` (was `journey`).
+//
 //  CloudKit-compatible: every stored property has an inline default, the
-//  relationship back to Journey is optional, and there are no unique
+//  relationship back to JourneyTemplate is optional, and there are no unique
 //  constraints.
 //
 
@@ -30,7 +34,7 @@ final class Waypoint {
     var descriptionText: String = ""
 
     /// Optional inverse relationship — optional to stay CloudKit-compatible.
-    var journey: Journey?
+    var template: JourneyTemplate?
 
     init(
         id: UUID = UUID(),

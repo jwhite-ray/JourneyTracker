@@ -14,12 +14,8 @@ struct DebugView: View {
     @Environment(HealthKitManager.self) private var health
     @Environment(\.modelContext) private var modelContext
 
-    @Query(sort: \Journey.startDate) private var journeys: [Journey]
+    @Query(sort: \UserJourney.startDate) private var journeys: [UserJourney]
     @Query private var anchors: [ProgressUpdate]
-
-    private var activeJourneys: [Journey] {
-        journeys.filter { $0.isActive && !$0.isCompleted }
-    }
 
     var body: some View {
         NavigationStack {
@@ -32,11 +28,9 @@ struct DebugView: View {
             }
             .navigationTitle("HealthKit Debug")
         }
-        .task {
-            // First launch triggers the authorization request; subsequent
-            // launches re-run the query and reinstall the observer.
-            await health.start()
-        }
+        // The app shell (RootView) owns the single `health.start()` at launch —
+        // seeding, authorization, and the observer install happen once there, so
+        // this screen no longer kicks off its own duplicate start.
     }
 
     // MARK: Authorization lifecycle
@@ -71,32 +65,33 @@ struct DebugView: View {
 
     @ViewBuilder
     private var journeysSection: some View {
-        if activeJourneys.isEmpty {
-            Section("Active journeys") {
-                Text("No active journeys.")
+        if journeys.isEmpty {
+            Section("Journeys (all instances)") {
+                Text("No journey instances. A fresh install has a seeded catalog but no runs yet.")
                     .foregroundStyle(.secondary)
             }
         } else {
-            Section("Active journeys") {
-                ForEach(activeJourneys) { journey in
+            Section("Journeys (all instances)") {
+                ForEach(journeys) { journey in
                     VStack(alignment: .leading, spacing: 4) {
                         Text(journey.name)
                             .font(.headline)
                             .accessibilityIdentifier("debug.journey.name.\(journey.name)")
+                        // Per-instance lifecycle status string (replaces the old
+                        // Active/Completed booleans).
+                        labeledRow("Status", journey.status.rawValue,
+                                   identifier: "debug.journey.status.\(journey.name)")
                         labeledRow("Accumulated (m)", "\(journey.distanceAccumulated)",
                                    identifier: "debug.journey.accumulated.\(journey.name)")
                         labeledRow("Total (m)", "\(journey.totalDistance)",
                                    identifier: "debug.journey.total.\(journey.name)")
                         labeledRow("Progress", String(format: "%.4f", journey.progress),
                                    identifier: "debug.journey.progress.\(journey.name)")
-                        labeledRow("Completed", journey.isCompleted ? "yes" : "no",
-                                   identifier: "debug.journey.completed.\(journey.name)")
                         Text("Since \(journey.startDate.formatted())")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 2)
-                    .accessibilityIdentifier("debug.journey.row.\(journey.name)")
                 }
             }
         }

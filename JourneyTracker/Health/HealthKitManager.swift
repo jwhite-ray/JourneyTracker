@@ -88,7 +88,10 @@ final class HealthKitManager {
 
     init(container: ModelContainer) {
         self.container = container
-        self.progressStore = ProgressStore(modelContainer: container)
+        // Share the ONE ProgressStore so HealthKit delta application and the
+        // KAN-10 lifecycle mutations serialize on the same context. A second
+        // ProgressStore would own a second context and reintroduce the race.
+        self.progressStore = ProgressStore.shared
     }
 
     // MARK: Lifecycle

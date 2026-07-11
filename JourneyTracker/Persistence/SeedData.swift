@@ -2,16 +2,21 @@
 //  SeedData.swift
 //  JourneyTracker
 //
-//  First-run seeding: the starter journeys plus the single shared delta
-//  anchor. Journey and waypoint numbers come from the App Concept doc's
-//  tables and live here in the DATA layer, never as literals in view code.
+//  First-run + every-launch seeding (KAN-10 shape).
 //
-//  Journeys start at first-run "now", and the anchor's anchorStartDate is that
-//  same instant, so there is no gap to backfill on a fresh install.
+//  Templates are CATALOG CONTENT: always ensured idempotently by name, with
+//  their waypoints, positions, and theme tokens — the same canonical tables
+//  from the App Concept doc, living here in the DATA layer, never as literals
+//  in view code.
 //
-//  Every insertable piece is guarded INDEPENDENTLY so an already-seeded dev
-//  install still receives anything added after it was first seeded, without
-//  ever duplicating a journey, waypoint, or anchor.
+//  Instances (UserJourney) are the user's runs and are NEVER auto-created — a
+//  fresh install has a fully-seeded catalog and an EMPTY "Your Journeys".
+//  Creating instances is a user action (KAN-11). The one exception is the
+//  migration restore: a store upgraded from the shipped combined-Journey shape
+//  recreates its instances from the migration stash (see JourneyMigration.swift)
+//  once, right after the templates it references are ensured.
+//
+//  The shared delta anchor is still seeded here (unchanged from KAN-6).
 //
 
 import Foundation
@@ -23,182 +28,103 @@ enum SeedData {
     /// never re-hardcoded here.
     private static let metersPerMile = DistanceFormatter.metersPerMile
 
-    // Stable identities used by the independent existence guards below. Names
-    // are the match key: these are seed-owned, original strings that no user
-    // flow renames, so name equality is a reliable identity for "already seeded"
-    // without needing a separate stable-UUID registry.
     private static let emberSpireName = "The Road to Ember Spire"
     private static let firstJourneyName = "First Journey"
+    private static let aroundTheWorldName = "Around the World"
 
-    /// Waypoint table for "The Road to Ember Spire" (name, cumulative miles,
-    /// normalized map position). Positions are image-relative (0...1).
-    private static let emberSpireWaypoints: [(name: String, miles: Double, x: Double, y: Double)] = [
-        ("Thistledown",    0,    0.12, 0.88),
-        ("Crosswater",     120,  0.28, 0.78),
-        ("Silvergate",     460,  0.20, 0.60),
-        ("The Deepdelve",  660,  0.40, 0.52),
-        ("Whisperwood",    720,  0.58, 0.55),
-        ("The Windmark",   1040, 0.52, 0.38),
-        ("Whitewatch",     1540, 0.70, 0.24),
-        ("Ember Spire",    1800, 0.82, 0.12),
+    /// A canonical template definition, seeded idempotently by name.
+    private struct TemplateSeed {
+        let name: String
+        let type: JourneyType
+        let totalMiles: Double
+        let backgroundImageName: String
+        let markerImageName: String
+        let accentColorToken: String
+        let pathColorToken: String
+        /// (name, cumulative miles, normalized map x, normalized map y).
+        let waypoints: [(name: String, miles: Double, x: Double, y: Double)]
+    }
+
+    /// The full catalog. Positions are image-relative (0...1). "Around the
+    /// World" is intentionally themeless (empty image names, default accent/
+    /// path) and has no mapped route.
+    private static let catalog: [TemplateSeed] = [
+        TemplateSeed(
+            name: emberSpireName,
+            type: .fantasy,
+            totalMiles: 1_800,
+            backgroundImageName: "ember_spire_bg",
+            markerImageName: "marker_wren",
+            accentColorToken: "accent/primary",
+            pathColorToken: "ink",
+            waypoints: [
+                ("Thistledown",    0,    0.12, 0.88),
+                ("Crosswater",     120,  0.28, 0.78),
+                ("Silvergate",     460,  0.20, 0.60),
+                ("The Deepdelve",  660,  0.40, 0.52),
+                ("Whisperwood",    720,  0.58, 0.55),
+                ("The Windmark",   1040, 0.52, 0.38),
+                ("Whitewatch",     1540, 0.70, 0.24),
+                ("Ember Spire",    1800, 0.82, 0.12),
+            ]
+        ),
+        TemplateSeed(
+            name: firstJourneyName,
+            type: .fantasy,
+            totalMiles: 10,
+            backgroundImageName: "first_journey_bg",
+            markerImageName: "marker_wren",
+            accentColorToken: "accent/secondary",
+            pathColorToken: "ink",
+            waypoints: [
+                ("Trailhead",         0,  0.15, 0.85),
+                ("First Rest",        1,  0.30, 0.72),
+                ("Willowbend",        3,  0.45, 0.60),
+                ("Old Oak",           7,  0.60, 0.42),
+                ("Lastlight Bridge",  9,  0.75, 0.28),
+                ("Journey's End",     10, 0.88, 0.14),
+            ]
+        ),
+        TemplateSeed(
+            name: aroundTheWorldName,
+            type: .realWorld,
+            totalMiles: 40_075_000 / 1609.344, // circumference in meters -> miles
+            backgroundImageName: "",
+            markerImageName: "",
+            accentColorToken: "accent/primary",
+            pathColorToken: "ink",
+            waypoints: []
+        ),
     ]
 
-    /// Waypoint table for "First Journey" (name, cumulative miles, normalized
-    /// map position).
-    private static let firstJourneyWaypoints: [(name: String, miles: Double, x: Double, y: Double)] = [
-        ("Trailhead",         0,  0.15, 0.85),
-        ("First Rest",        1,  0.30, 0.72),
-        ("Willowbend",        3,  0.45, 0.60),
-        ("Old Oak",           7,  0.60, 0.42),
-        ("Lastlight Bridge",  9,  0.75, 0.28),
-        ("Journey's End",     10, 0.88, 0.14),
-    ]
-
-    /// Seeds the journeys and the single shared anchor. Each insertable is
-    /// guarded INDEPENDENTLY so, whenever the existence checks can be trusted,
-    /// exactly one of each is ever created. Idempotent — safe on every launch.
+    /// Ensures the catalog + the shared anchor exist, then drains any migration
+    /// stash into instances. Idempotent — safe on every launch.
     ///
     /// If any existence fetch THROWS, we can't tell "empty" from "unknown", so
-    /// we abort seeding entirely rather than risk duplicating on a populated
-    /// store.
+    /// we abort rather than risk duplicating on a populated store.
     static func seedIfNeeded(in context: ModelContext) {
         let now = Date()
 
-        // Distinguish "fetch threw" from "genuinely empty" — a throwing fetch
-        // must not read as empty and trigger duplicate inserts.
-        let existingJourneys: [Journey]
+        let existingTemplates: [JourneyTemplate]
         let existingAnchors: [ProgressUpdate]
         do {
-            existingJourneys = try context.fetch(FetchDescriptor<Journey>())
+            existingTemplates = try context.fetch(FetchDescriptor<JourneyTemplate>())
             existingAnchors = try context.fetch(FetchDescriptor<ProgressUpdate>())
         } catch {
             print("[SeedData] Existence check failed; aborting seed to avoid duplicates: \(error)")
             return
         }
 
-        // MARK: - Original starter set (Ember Spire + Around the World)
-        //
-        // Guarded on the store being empty, preserving the original all-or-
-        // nothing behavior for the very first seed of these two.
-        if existingJourneys.isEmpty {
-            // Journey 1 — fantasy, 1,800 mi. Themed.
-            let emberSpire = Journey(
-                name: emberSpireName,
-                type: .fantasy,
-                totalDistance: 2_896_819,
-                startDate: now,
-                backgroundImageName: "ember_spire_bg",
-                markerImageName: "marker_wren",
-                accentColorToken: "accent/primary",
-                pathColorToken: "ink"
-            )
-            context.insert(emberSpire)
-
-            var waypoints: [Waypoint] = []
-            for (index, entry) in emberSpireWaypoints.enumerated() {
-                let waypoint = Waypoint(
-                    order: index,
-                    positionX: entry.x,
-                    positionY: entry.y,
-                    distanceFromStart: entry.miles * metersPerMile,
-                    name: entry.name
-                )
-                waypoint.journey = emberSpire
-                context.insert(waypoint)
-                waypoints.append(waypoint)
-            }
-            emberSpire.waypoints = waypoints
-
-            // Journey 2 — real world, circumference of the Earth. Neutral theme:
-            // no map in scope, so background/marker stay empty and accent/path
-            // fall to their model defaults.
-            let aroundTheWorld = Journey(
-                name: "Around the World",
-                type: .realWorld,
-                totalDistance: 40_075_000,
-                startDate: now
-            )
-            context.insert(aroundTheWorld)
-        }
-
-        // MARK: - First Journey — independent existence guard
-        //
-        // Keyed on name equality against the current store snapshot, mirroring
-        // the anchor's independent guard. Inserted iff not already present, so
-        // an install seeded before First Journey existed still receives it, and
-        // relaunches never duplicate it.
-        if !existingJourneys.contains(where: { $0.name == firstJourneyName }) {
-            let firstJourney = Journey(
-                name: firstJourneyName,
-                type: .fantasy,
-                totalDistance: 10 * metersPerMile,
-                startDate: now,
-                isActive: true,
-                backgroundImageName: "first_journey_bg",
-                markerImageName: "marker_wren",
-                accentColorToken: "accent/secondary",
-                pathColorToken: "ink"
-            )
-            context.insert(firstJourney)
-
-            var waypoints: [Waypoint] = []
-            for (index, entry) in firstJourneyWaypoints.enumerated() {
-                let waypoint = Waypoint(
-                    order: index,
-                    positionX: entry.x,
-                    positionY: entry.y,
-                    distanceFromStart: entry.miles * metersPerMile,
-                    name: entry.name
-                )
-                waypoint.journey = firstJourney
-                context.insert(waypoint)
-                waypoints.append(waypoint)
-            }
-            firstJourney.waypoints = waypoints
-        }
-
-        // MARK: - Ember Spire position backfill (one-time, self-limiting)
-        //
-        // Older installs seeded Ember Spire's waypoints at the (0, 0) sentinel.
-        // Rewrite any still at that sentinel to their real coordinates, keyed by
-        // `order`. Safe precisely because no seeded coordinate is (0, 0), so a
-        // correctly-positioned waypoint is never mistaken for un-seeded and the
-        // backfill is a no-op once applied.
-        for journey in existingJourneys where journey.name == emberSpireName {
-            guard let waypoints = journey.waypoints else { continue }
-            for waypoint in waypoints where waypoint.positionX == 0 && waypoint.positionY == 0 {
-                guard waypoint.order < emberSpireWaypoints.count else { continue }
-                let entry = emberSpireWaypoints[waypoint.order]
-                waypoint.positionX = entry.x
-                waypoint.positionY = entry.y
+        // MARK: - Templates — always ensured idempotently, by name.
+        for seed in catalog {
+            if let existing = existingTemplates.first(where: { $0.name == seed.name }) {
+                backfill(template: existing, from: seed)
+            } else {
+                insert(seed: seed, in: context)
             }
         }
 
-        // MARK: - Theme token backfill (one-time, self-limiting)
-        //
-        // Installs seeded BEFORE JourneyTheme fields existed have the themed
-        // journeys at empty `backgroundImageName` (and default accent/path).
-        // Backfill the design tokens for those, matched by name. Guarded on
-        // `backgroundImageName.isEmpty`, so it is a no-op once applied and never
-        // touches a journey that already carries a theme. "Around the World"
-        // stays intentionally neutral (empty image names) and is NOT listed
-        // here, so it is never backfilled.
-        let themeBackfill: [String: (bg: String, marker: String, accent: String, path: String)] = [
-            emberSpireName: ("ember_spire_bg", "marker_wren", "accent/primary", "ink"),
-            firstJourneyName: ("first_journey_bg", "marker_wren", "accent/secondary", "ink"),
-        ]
-        for journey in existingJourneys where journey.backgroundImageName.isEmpty {
-            guard let theme = themeBackfill[journey.name] else { continue }
-            journey.backgroundImageName = theme.bg
-            journey.markerImageName = theme.marker
-            journey.accentColorToken = theme.accent
-            journey.pathColorToken = theme.path
-        }
-
-        // MARK: - Shared delta anchor — independent existence guard
-        //
-        // On a normal fresh install it shares `now` with the journeys above, so
-        // there is no gap to backfill.
+        // MARK: - Shared delta anchor — independent existence guard.
         if existingAnchors.isEmpty {
             let anchor = ProgressUpdate(
                 anchorStartDate: now,
@@ -210,5 +136,116 @@ enum SeedData {
         }
 
         try? context.save()
+
+        // MARK: - Migration restore — recreate instances from the stash ONCE,
+        // now that every template they reference is guaranteed present.
+        restoreMigratedInstances(in: context)
+    }
+
+    // MARK: - Template insert / backfill
+
+    private static func insert(seed: TemplateSeed, in context: ModelContext) {
+        let template = JourneyTemplate(
+            name: seed.name,
+            type: seed.type,
+            totalDistance: seed.totalMiles * metersPerMile,
+            backgroundImageName: seed.backgroundImageName,
+            markerImageName: seed.markerImageName,
+            accentColorToken: seed.accentColorToken,
+            pathColorToken: seed.pathColorToken
+        )
+        context.insert(template)
+
+        var waypoints: [Waypoint] = []
+        for (index, entry) in seed.waypoints.enumerated() {
+            let waypoint = Waypoint(
+                order: index,
+                positionX: entry.x,
+                positionY: entry.y,
+                distanceFromStart: entry.miles * metersPerMile,
+                name: entry.name
+            )
+            waypoint.template = template
+            context.insert(waypoint)
+            waypoints.append(waypoint)
+        }
+        template.waypoints = waypoints
+    }
+
+    /// One-time, self-limiting backfills for a template seeded before a field
+    /// existed. Each is guarded on a sentinel so it is a no-op once applied.
+    private static func backfill(template: JourneyTemplate, from seed: TemplateSeed) {
+        // Theme tokens: only backfill a template still at the empty-background
+        // sentinel, and only for a seed that actually carries art ("Around the
+        // World" stays intentionally themeless and is never backfilled).
+        if template.backgroundImageName.isEmpty && !seed.backgroundImageName.isEmpty {
+            template.backgroundImageName = seed.backgroundImageName
+            template.markerImageName = seed.markerImageName
+            template.accentColorToken = seed.accentColorToken
+            template.pathColorToken = seed.pathColorToken
+        }
+
+        // Waypoint positions: rewrite any still at the (0, 0) sentinel to their
+        // real coordinates, keyed by `order`. Safe because no seeded coordinate
+        // is (0, 0), so a placed waypoint is never mistaken for un-seeded.
+        guard let waypoints = template.waypoints else { return }
+        for waypoint in waypoints where waypoint.positionX == 0 && waypoint.positionY == 0 {
+            guard waypoint.order < seed.waypoints.count else { continue }
+            let entry = seed.waypoints[waypoint.order]
+            waypoint.positionX = entry.x
+            waypoint.positionY = entry.y
+        }
+    }
+
+    // MARK: - Migration restore
+
+    /// Drains the KAN-10 migration stash: each stashed legacy journey becomes a
+    /// fresh UserJourney matched to its template by name, with distance and
+    /// start date verbatim and status mapped from the old booleans. Clears the
+    /// stash afterward, so this runs exactly once per upgrade.
+    private static func restoreMigratedInstances(in context: ModelContext) {
+        guard let snapshots = MigrationStash.load() else { return }
+
+        let templates = (try? context.fetch(FetchDescriptor<JourneyTemplate>())) ?? []
+        let byName = Dictionary(templates.map { ($0.name, $0) }, uniquingKeysWith: { first, _ in first })
+
+        // Drain idempotently. insert -> save -> clear is NOT crash-atomic: a
+        // kill between the save and the clear would re-drain on the next launch
+        // and duplicate every instance (including two `.active` of one template
+        // — an invisible delta double-credit behind one-card precedence). So we
+        // skip any snapshot whose template already carries an instance matching
+        // it exactly (same startDate + distanceAccumulated). A re-run therefore
+        // recreates nothing, and we only clear the stash after a CONFIRMED save.
+        let existing = (try? context.fetch(FetchDescriptor<UserJourney>())) ?? []
+
+        for snapshot in snapshots {
+            guard let template = byName[snapshot.name] else {
+                // No matching template (renamed/removed content). Nothing to
+                // attach to — skip; the stash is still cleared below (once the
+                // save succeeds) so it is not retried forever.
+                continue
+            }
+            let alreadyRestored = existing.contains { instance in
+                instance.template?.persistentModelID == template.persistentModelID
+                    && instance.startDate == snapshot.startDate
+                    && instance.distanceAccumulated == snapshot.distanceAccumulated
+            }
+            if alreadyRestored { continue }
+
+            let instance = UserJourney(
+                startDate: snapshot.startDate,
+                distanceAccumulated: snapshot.distanceAccumulated,
+                status: snapshot.mappedStatus,
+                template: template
+            )
+            context.insert(instance)
+        }
+
+        do {
+            try context.save()
+            MigrationStash.clear() // only after the instances are durably saved
+        } catch {
+            print("[SeedData] Migration restore save failed — keeping stash for retry: \(error)")
+        }
     }
 }

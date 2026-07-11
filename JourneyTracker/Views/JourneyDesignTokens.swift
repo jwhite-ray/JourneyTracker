@@ -18,7 +18,9 @@ enum DesignToken {
     static let parchment = "bg/parchment"
     static let ink = "ink"
     static let card = "surface/card"
+    static let accentPrimary = "accent/primary"
     static let reward = "accent/reward"
+    static let alert = "accent/alert"
     static let charCloak = "char/cloak"
     static let charSkin = "char/skin"
 }

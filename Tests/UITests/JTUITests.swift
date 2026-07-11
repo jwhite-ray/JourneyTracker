@@ -120,21 +120,29 @@ final class JTUITests: XCTestCase {
     }
 
 
-    // Verify the new accessibility identifiers resolve, and print their values.
+    // Verify the top-level debug identifiers resolve, and print their values.
+    //
+    // KAN-10: a FRESH install has a fully-seeded catalog but ZERO journey
+    // instances by design (creating a run is a user action — KAN-11), so the
+    // per-journey rows (debug.journey.*) are NOT asserted here — they only exist
+    // once instances do (e.g. after a migration from the pre-KAN-10 store, or
+    // once KAN-11 lets a user start a journey). This test asserts the always-
+    // present top-level fields; per-instance rows are reported soft.
     func testReadIdentifiers() {
         let app = XCUIApplication(bundleIdentifier: jtBundle)
         app.activate()
         sleep(2)
+        // Move to the Debug tab (the journey list is now the first tab).
+        let debugTab = app.tabBars.buttons["Debug"].firstMatch
+        if debugTab.waitForExistence(timeout: 5) { debugTab.tap() }
+        sleep(1)
         app.swipeDown(); app.swipeDown()
         sleep(1)
-        let ids = ["debug.requestPhase", "debug.requestStatus", "debug.lastQuery",
-                   "debug.cumulativeDistance", "debug.steps", "debug.rerunButton",
-                   "debug.journey.accumulated.The Road to Ember Spire",
-                   "debug.journey.progress.The Road to Ember Spire",
-                   "debug.journey.accumulated.Around the World",
-                   "debug.journey.progress.Around the World"]
+        // Always-present, instance-independent fields.
+        let requiredIDs = ["debug.requestPhase", "debug.requestStatus", "debug.lastQuery",
+                           "debug.cumulativeDistance", "debug.steps", "debug.rerunButton"]
         var report: [String] = []
-        for id in ids {
+        for id in requiredIDs {
             var el = app.descendants(matching: .any).matching(identifier: id).firstMatch
             if el.waitForExistence(timeout: 4) {
                 report.append("FOUND \(id) = [\(el.label)]")
@@ -148,6 +156,14 @@ final class JTUITests: XCTestCase {
                 }
             }
         }
+
+        // Per-instance rows: soft-reported, not required. When instances exist,
+        // each carries a status/accumulated/progress row keyed by journey name.
+        let instanceRows = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'debug.journey.'"))
+        let instanceCount = instanceRows.count
+        report.append("INSTANCE-ROWS present = \(instanceCount)")
+
         let advisory = app.descendants(matching: .any).matching(identifier: "debug.advisory").firstMatch
         report.append(advisory.exists ? "ADVISORY visible = [\(advisory.label)]" : "ADVISORY not visible")
         NSLog("IDREPORT-BEGIN | %@ | IDREPORT-END", report.joined(separator: " | "))
