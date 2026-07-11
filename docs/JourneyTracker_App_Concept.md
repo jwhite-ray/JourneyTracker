@@ -167,9 +167,9 @@ enum JourneyStatus: String, Codable, CaseIterable {
 
 **Seeding after KAN-10.** Templates are *always* ensured (idempotent, by name). Instances are *never* auto-created on a fresh install — a new install has a fully-seeded catalog and an empty "Your Journeys". Creating instances is a user action — the `+` / **Available Journeys** store page (KAN-11); see "Available Journeys & the start flow" below.
 
-## Available Journeys (the store page) & the start flow (KAN-11 — Decided, not built)
+## Available Journeys (the store page) & the start flow (KAN-11 — Built, PR #8)
 
-**Decided (KAN-11), not yet built.** KAN-10 seeds a full catalog but gives no way to start a run — a fresh install has an empty "Your Journeys". KAN-11 adds the entry point that first creates a `UserJourney`. Until Dan ships it, this section is the target shape, not the code.
+**Built (KAN-11, PR #8 — merged).** KAN-10 seeds a full catalog but gives no way to start a run — a fresh install has an empty "Your Journeys". KAN-11 adds the entry point that first creates a `UserJourney`. Until Dan ships it, this section is the target shape, not the code.
 
 **Entry point.** A circled `+` lives in the "Your Journeys" navigation bar (trailing) at all times — populated or empty — and opens **Available Journeys**, the catalog/store page. The empty state gains a primary CTA that opens the same screen, so an empty "Your Journeys" is never a dead end. Both the toolbar `+` and the empty-state CTA drive one shared navigation destination.
 
@@ -195,6 +195,18 @@ enum JourneyStatus: String, Codable, CaseIterable {
 **Works with HealthKit never granted.** A started run sits at `distanceAccumulated = 0` and simply accrues future deltas whenever (if ever) Health data arrives — the shared monotonic anchor keeps advancing regardless. Starting never backfills; a run created "now" starts at 0 (see "The one assumption that matters most" and the delta-anchor rules).
 
 **Out of scope for KAN-11:** purchases / paywall, rendering premium-locked visuals beyond a structural slot, `isFeatured` behavior (the featured shelf), and the trophy case (superseded completed instances). The row leaves room for these; none is wired.
+
+## Delete a journey (KAN-13 — Built, PR #9)
+
+**Built (KAN-13, PR #9).** A card's kebab (`•••`) on "Your Journeys" gains a **Delete** row on every status (active / paused / completed), below the lifecycle actions. Delete **wipes the journey's data entirely and returns the template to a startable state** — the primary use is testing (delete, then re-start fresh from the store), but it is also the real "completely remove this" affordance.
+
+**Scope: template-wide, all instances.** Delete keys on the **`JourneyTemplate`**, not the single shown instance, and destroys **every** `UserJourney` of that template — active, paused, **and** completed history. Deleting only the shown instance is wrong: KAN-10 Ruling 1's one-card precedence would then surface a buried completed/paused sibling as a new card right after the user asked to remove it. Deleting a **completed** card therefore **destroys its completion record** (and its future trophy) — the only self-consistent reading of "completely remove." Because delete wipes *all* instances including superseded completions, it is also the correct primitive for the future **trophy case**: a template-wide delete clears every trophy for that template, and the trophy case (when built) must treat this as authoritative and never resurrect a deleted completion.
+
+**What delete never touches:** the `JourneyTemplate` (shared, re-seeded catalog content — it stays and returns to startable), and the shared `ProgressUpdate` anchor (`lastProcessedDistance` / `anchorStartDate`). The anchor keeps advancing monotonically; a template started again after delete accrues from the next delta forward at 0, exactly like any fresh start.
+
+**Where the mutation lives.** Deleting is a new serialized method on the `ProgressStore` `@ModelActor` — `deleteJourney(templateID: PersistentIdentifier)` — extending KAN-10 Ruling 3 (every instance write routes through this one actor's single context). It resolves the template on the actor's own context (throws `LifecycleError.templateNotFound` if it doesn't resolve), fetches all `UserJourney` and deletes those matching the template's ID in one save, and **deletes instances only — never the template, never the anchor**. It **fails closed**: a throwing guard fetch throws `LifecycleError.guardCheckFailed` and aborts *before* deleting anything (no partial delete); an empty match set is a no-op success (covers the double-tap race). Because delete serializes with delta application on the one context, an in-flight HealthKit delta and a delete can never interleave — the delta lands fully before the wipe or finds no instance after it, so no double-credit and no corruption. After delete, the template's Available Journeys row is startable again (KAN-11 predicate: no active and no paused instance).
+
+**Confirmation (§07).** Every status routes through the §07 destructive confirmation (dimmed scrim, alert language, **Cancel first**), reusing the KAN-10 paused-restart overlay pattern — no new visual language. Active/paused copy discards "X mi" of progress via `DistanceFormatter`; completed copy destroys the completion record; all state the journey returns to Available Journeys and that it can't be undone.
 
 ## Future-proofing checklist
 
@@ -274,7 +286,9 @@ Views read `Image(journey.theme.backgroundImageName)`, `Color(journey.theme.acce
 - "Your Journeys" renders one card per template (highest-precedence instance) with the §07 status stamp + kebab action menu + destructive restart confirmation. Instances are never auto-seeded — a fresh install has a full catalog and an empty list.
 - Not in KAN-10: the entry point that *creates* an instance (the `+` / Available Journeys store — KAN-11), the trophy case for superseded completions, purchase/premium gating.
 
-**KAN-11 (Decided, not built)** — the Available Journeys store page and the start flow that first creates a `UserJourney`. See "Available Journeys (the store page) & the start flow" above.
+**KAN-11 (built, PR #8 — merged)** — the Available Journeys store page and the start flow that first creates a `UserJourney`. See "Available Journeys (the store page) & the start flow" above.
+
+**KAN-13 (built, PR #9)** — Delete a journey from "Your Journeys" (template-wide data wipe) via the card kebab. New serialized `ProgressStore.deleteJourney(templateID:)`; §07 destructive confirmation per status; returns the template to startable; anchor and other journeys untouched. See "Delete a journey (KAN-13)" above.
 
 ## What NOT to worry about yet
 
