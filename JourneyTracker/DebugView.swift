@@ -125,6 +125,13 @@ struct DebugView: View {
                 Task { await health.refresh() }
             }
             .accessibilityIdentifier("debug.rerunButton")
+
+            // KAN-18 (P1) faceted-terrain look-proof. Dev-only entry — the real
+            // terrain lands under KAN-7's map at P4, not here.
+            NavigationLink("Terrain specimen (KAN-18)") {
+                TerrainSpecimenView()
+            }
+            .accessibilityIdentifier("debug.terrainSpecimen")
         }
     }
 
