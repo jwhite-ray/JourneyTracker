@@ -132,6 +132,13 @@ struct DebugView: View {
                 TerrainSpecimenView()
             }
             .accessibilityIdentifier("debug.terrainSpecimen")
+
+            // KAN-19 (P2) seeded map generator + persistent tuning harness. This
+            // is the map-authoring surface, not a throwaway dev screen.
+            NavigationLink("Map tuning harness (KAN-19)") {
+                MapTuningHarnessView()
+            }
+            .accessibilityIdentifier("debug.mapTuningHarness")
         }
     }
 
