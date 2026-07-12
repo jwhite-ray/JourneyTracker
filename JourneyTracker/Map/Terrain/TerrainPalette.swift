@@ -83,6 +83,19 @@ struct TerrainPalette {
     /// the same appearance the terrain was resolved for.
     func accent(_ token: String) -> Color { Color(token: token) }
 
+    /// Linear blend between two already-material tones, resolved through the same
+    /// appearance. Used only to melt a river mouth toward the receiving water's
+    /// band tone (§07.3.3) — both inputs are `terrain/water` facet tones, so the
+    /// result is derived from the water material, never a literal.
+    func mix(_ a: Color, _ b: Color, _ t: CGFloat) -> Color {
+        let ra = a.resolve(in: environment)
+        let rb = b.resolve(in: environment)
+        let k = Float(min(max(t, 0), 1))
+        return Color(red: Double(ra.red + (rb.red - ra.red) * k),
+                     green: Double(ra.green + (rb.green - ra.green) * k),
+                     blue: Double(ra.blue + (rb.blue - ra.blue) * k))
+    }
+
     // MARK: - Facet derivation
 
     private static func material(named token: String, in env: EnvironmentValues) -> TerrainMaterial {

@@ -273,6 +273,8 @@ A range, a forest, a river, a lake, a coastline, a village site are each one *re
 
 The design session fixed logical constraints on how terrain relates: rivers start off-screen or in mountains and terminate in a lake or at the coastline (never mid-land, never continuing under the ocean fill); roads and the trek path stay on land and never cross a lake or ocean; settlements sit near water (river bank, lake shore, coast). These are checked when a map is authored/generated, and a violation **fails authoring, not the render**.
 
+Three further validators were fixed at the **KAN-18 Phase 1 gate** and are decided in their own blocks below — they join this same P2 build-time validator list: **every waypoint lies on the trek path**, **every terrain region's real-mile size falls within its canonical bounds**, and **a mountain range's *total authored* length meets its minimum even when the range runs off-map**.
+
 - *Trap:* checking these at runtime and drawing a "best-effort" broken map, or trusting authors to remember them.
 - *Mitigation:* a validator over the region set and its generated placement, so a map that breaks a rule is an authoring error the author fixes. The shipped map is correct by construction.
 
@@ -282,6 +284,42 @@ Waypoints, regions, and the trek path are all authored in *map units* — the jo
 
 - *Trap:* the coordinate space the shipped KAN-7 map uses. Today `JourneyMapView.swift` positions waypoints and pins as fractions of the container (`waypoint.positionX * geo.size.width`, `positionY * geo.size.height`), and `MarkerPositionCalculator` returns normalized 0…1 points. That normalized image-relative space is correct and sufficient for a *single-screen* pin-and-route map, but it can't zoom, can't exceed the screen, and ties layout to device size. A faceted map is far larger than one screen.
 - *Mitigation:* one map-unit space per fantasy journey (its bounds are journey data), one camera transform at draw time. **This extends and supersedes the normalized 0…1 space in P4** (below) — it is not a bug in KAN-7, it is the next coordinate model the terrain and camera require.
+
+**Decided (KAN-18 P1 gate): each fantasy map's map-unit space has a real-distance scale.**
+
+The map-unit space above stops being scale-agnostic the moment a map is authored for a real journey. The trek path's drawn **arc length** in map units corresponds to the journey's real `totalDistance` (meters), and waypoint `distanceFromStart` values pin intermediate points along that path. Together these define a **miles-per-map-unit** scale for that journey. Region sizes (the bounds block below) are authored and validated in **real miles** and converted through this scale into map units at authoring time.
+
+- This is the honest answer to "the specimen looks like 10 miles, not 1,800": with a real scale the map canvas *grows with journey length*, and one screen at chapter zoom shows a single leg — not the whole world. P1's hand-placed specimen is deliberately scale-agnostic; scale becomes real at P2 authoring.
+- *The one subtlety worth stating:* a drawn trek path meanders, so its map-unit arc length is longer than the journey's straight-line displacement across the map. The scale is defined by **trek-path arc length ↔ journey `totalDistance`**, not by straight-line distance — and everything else (region-size conversion, marker interpolation) follows from that single identity.
+- *Trap — meander is a scale knob in disguise:* authoring a wildly meandering trek path silently compresses apparent terrain scale. The same real mile buys fewer map units of straight-line extent, so a range or forest authored in real miles renders smaller relative to the visible corridor than the author expects.
+- *Mitigation:* keep trek-path meander moderate, and treat the arc-length ↔ `totalDistance` identity as the one true definition of scale. If terrain reads wrong-sized, the fix is the path's arc length, never per-region fudge factors.
+
+**Decided (KAN-18 P1 gate): every waypoint lies ON the trek-path polyline.**
+
+The dotted trek path is the line the user's avatar travels, and it is the spine of the map. **Every waypoint's position is a point on that polyline** — geometrically, the trek path passes through each waypoint at that waypoint's `distanceFromStart` along the path. A waypoint is not placed *near* the path or beside it; it *is* the point on the path at its distance. (In KAN-7 today the marker rides a polyline that connects the waypoints, so this holds trivially; in P4 the trek path is authored as its own `trekPath` region and the marker rides *that*, so the rule ensures the authored path still passes through every waypoint.)
+
+- *Why it matters — the marker-interpolation implication:* the marker rides the trek path by real distance (per "the map reads progress" below). Because waypoints are pinned to the same path at the same distances, **marker-position and waypoint-position agree exactly** at the moment the marker crosses a waypoint. An off-path waypoint would make the marker "arrive" at a spot the waypoint visibly isn't — and would desync the KAN-14 crossing that fires at that distance.
+- *Validator (P2):* a map any of whose waypoint positions does not lie on the trek-path polyline (within tolerance) **fails authoring**.
+- *Trap:* authoring a waypoint at an evocative spot beside the path but off it.
+- *Mitigation:* author waypoints by `distanceFromStart` and let the path define position, or snap authored positions onto the path, then validate.
+
+**Decided (KAN-18 P1 gate): terrain regions are sized in REAL MILES, within canonical bounds.**
+
+Region extents are authored and validated in real miles (converted to map units through the journey's scale above), giving terrain real-world plausibility. The canonical bounds for `MapRegion` records, enforced by P2 validators:
+
+| Region kind | Bound (real-world) |
+|---|---|
+| Mountain range | 75–300 miles long; never more than 10 miles wide |
+| Forest | 0.5–300 square miles |
+| River | never shorter than 2 miles long |
+| Lake | 0.3–30 square miles |
+| Ocean | no size restriction |
+
+- *Ranges run off-map (the small-journey ruling):* scenery is bigger than the journey. Small maps — First Journey (10 mi), The Lantern Road (20 mi) — cannot contain a 75-mile range, so a range may **extend beyond the map's authored bounds**; the small map shows a big range merely passing through its corridor. Validators check a range's **total authored length** (which may exceed the map bounds), never its on-map visible portion. Regions may be authored partly outside `bounds` and the renderer clips them — the `Canvas` already culls to the visible rect, so clipping is free.
+- *Trap — clipped-portion validation cuts both ways:* validating the visible (clipped) portion of a region would either reject a legitimately large range on a small map, or tempt the author to shrink scenery below real-world plausibility just to make it fit inside the bounds. Both are wrong.
+- *Mitigation:* validate the authored (total) extent in real miles; let the renderer clip to bounds at draw time.
+
+*Visual cross-reference:* the *look* of these rulings — the always-labeled destination pin, the lake facet seam, the river-confluence melt — is Jeff's, in `docs/DESIGN_SYSTEM.md`'s terrain & cartography section. This doc owns where waypoints and regions sit, how they're sized, and how they're validated; that doc owns how they're drawn. Neither restates the other.
 
 **Decided: terrain is drawn in a single-pass SwiftUI `Canvas`, visible-rect culled; no per-glyph view hierarchy.**
 
@@ -443,8 +481,9 @@ All properties need inline default values and optional relationships to stay Clo
 - KAN-10: relationship back-reference is `template` (was `journey`)
 
 **Map authoring data** (fantasy journeys only, KAN-16 — the input to the seeded scatter generator; **Decided, not built**)
-- the journey's map-unit `bounds` (its logical coordinate space) and a single scatter `seed`
-- an ordered list of **MapRegion** records: `kind` (range / forest / river / lake / coast / groundCover / settlement / road / **trekPath**), a shape spec in map units (blob or ellipse extent; river source→mouth; village site; path polyline), and scatter parameters (density, jitter, feather)
+- the journey's map-unit `bounds` (its logical coordinate space), its **miles-per-map-unit scale** (defined by trek-path arc length ↔ journey `totalDistance`, per "The fantasy map"), and a single scatter `seed`
+- an ordered list of **MapRegion** records: `kind` (range / forest / river / lake / coast / groundCover / settlement / road / **trekPath**), a shape spec (blob or ellipse extent; river source→mouth; village site; path polyline) authored and validated in **real miles** and converted to map units through the scale, subject to the canonical size bounds (KAN-18: ranges 75–300 mi long / ≤10 mi wide, forests 0.5–300 sq mi, rivers ≥2 mi, lakes 0.3–30 sq mi, oceans unrestricted), and scatter parameters (density, jitter, feather). A region may be authored partly outside `bounds` (a range running off-map); the range validator checks *total authored* length, and the renderer clips.
+- every **Waypoint** position on a fantasy journey lies on the `trekPath` polyline at its `distanceFromStart` — a P2 authoring validator (KAN-18), not just a convention; this is what keeps the distance-driven marker and the waypoint pins coincident at crossings.
 - This is *static authored content*, not user-mutable state, and it is **deliberately NOT a CloudKit-synced SwiftData model** — unlike `UserJourney` / `WaypointCrossing` / `ProgressUpdate`. It travels as part of the bundled journey definition (JSON) alongside the `JourneyTemplate` catalog content; the generator expands it to glyphs deterministically at load. Nothing here changes as the user walks — only the marker's position moves (read from progress via `MarkerPositionCalculator`, or its P4 map-unit successor). Because the map is a pure function of `(regions, seed)`, iCloud devices regenerate an identical map without syncing any glyph positions: only the small authoring input needs to be present, and it ships as bundled content rather than synced state.
 
 **Character**

@@ -230,39 +230,83 @@ enum TerrainRenderer {
     private static func drawRiver(_ river: TerrainRiver,
                                   into ctx: inout GraphicsContext,
                                   palette: TerrainPalette) {
-        let pts = sampledCurve(river.centerline)
+        // A melting mouth runs a short way PAST its authored end into the
+        // receiving water, so the body (same water token as the receiver's fill)
+        // overlaps it and fill continuity — not an edge — makes the join. Rivers
+        // draw after lakes/ocean (§07.6), so this overlap sits on top and, being
+        // the same tone, reads seamless.
+        let melts = river.mouth != .inland
+        var line = river.centerline
+        if melts, line.count >= 2 {
+            let a = line[line.count - 2], b = line[line.count - 1]
+            let dir = CGVector(dx: b.x - a.x, dy: b.y - a.y).normalized
+            line.append(CGPoint(x: b.x + dir.dx * 12, y: b.y + dir.dy * 12))
+        }
+        let pts = sampledCurve(line)
         guard pts.count >= 2 else { return }
+        let n = pts.count
 
+        func t(_ i: Int) -> CGFloat { CGFloat(i) / CGFloat(n - 1) }
         func bodyWidth(at i: Int) -> CGFloat {
-            let t = CGFloat(i) / CGFloat(pts.count - 1)
-            return river.sourceWidth + (river.mouthWidth - river.sourceWidth) * t
+            river.sourceWidth + (river.mouthWidth - river.sourceWidth) * t(i)
+        }
+        // Bank (dark) margin fades to the body width over the last stretch of a
+        // melting river, so the dark bank never caps across the receiving water.
+        func bankWidth(at i: Int) -> CGFloat {
+            let full = bodyWidth(at: i) * (13.0 / 9.0)
+            guard melts else { return full }
+            return full + (bodyWidth(at: i) - full) * smoothFade(t(i), from: 0.68)
+        }
+        // Highlight ribbon fades to nothing at a melting mouth — no bright stub
+        // left floating on the receiving water.
+        func ribbonWidth(at i: Int) -> CGFloat {
+            let base = bodyWidth(at: i) * (3.0 / 9.0)
+            guard melts else { return base }
+            return base * (1 - smoothFade(t(i), from: 0.78))
+        }
+        // At a SEA mouth the shallowest band the body meets is the pale shallows,
+        // so the body transitions base → shallow-band tone at the very end; a
+        // freshwater (lake) mouth meets the lake's own base fill and needs none.
+        func bodyColor(at i: Int) -> Color {
+            guard river.mouth == .sea else { return palette.water.base }
+            return palette.mix(palette.water.base, palette.water.highlight,
+                               smoothFade(t(i), from: 0.72))
         }
 
-        // Three passes, thickest→thinnest, taper carried by bodyWidth.
-        // Bank (dark), body (base), highlight ribbon (light, nudged up-left).
-        strokeTapered(pts, into: &ctx, color: palette.water.deep,
-                      widthAt: { bodyWidth(at: $0) * (13.0 / 9.0) }, offset: .zero)
-        strokeTapered(pts, into: &ctx, color: palette.water.base,
-                      widthAt: { bodyWidth(at: $0) }, offset: .zero)
-        strokeTapered(pts, into: &ctx, color: palette.water.highlight,
-                      widthAt: { bodyWidth(at: $0) * (3.0 / 9.0) },
-                      offset: CGVector(dx: -1.5, dy: -1.5))
+        // Three passes, thickest→thinnest. Bank (dark), body (base), highlight
+        // ribbon (light, nudged up-left).
+        strokeTapered(pts, into: &ctx, colorAt: { _ in palette.water.deep },
+                      widthAt: bankWidth, offset: .zero)
+        strokeTapered(pts, into: &ctx, colorAt: bodyColor,
+                      widthAt: bodyWidth, offset: .zero)
+        strokeTapered(pts, into: &ctx, colorAt: { _ in palette.water.highlight },
+                      widthAt: ribbonWidth, offset: CGVector(dx: -1.5, dy: -1.5))
     }
 
-    /// Strokes a polyline segment-by-segment with a per-segment width, giving a
-    /// genuine source→mouth taper (a single Path stroke can't vary width). Round
-    /// caps overlap to hide the seams.
+    /// Smoothstep ramp from 0 (at/below `start`) up to 1 at t = 1 — used to fade a
+    /// river's bank/ribbon out and blend its body tone toward a melting mouth.
+    private static func smoothFade(_ t: CGFloat, from start: CGFloat) -> CGFloat {
+        guard t > start, start < 1 else { return t >= 1 ? 1 : 0 }
+        let k = min((t - start) / (1 - start), 1)
+        return k * k * (3 - 2 * k)
+    }
+
+    /// Strokes a polyline segment-by-segment with a per-segment width and colour,
+    /// giving a genuine source→mouth taper and letting the mouth fade its bank /
+    /// blend its body tone (a single Path stroke can't vary either). Round caps
+    /// overlap to hide the seams.
     private static func strokeTapered(_ pts: [CGPoint],
                                       into ctx: inout GraphicsContext,
-                                      color: Color,
+                                      colorAt: (Int) -> Color,
                                       widthAt: (Int) -> CGFloat,
                                       offset: CGVector) {
         for i in 0..<(pts.count - 1) {
+            let w = (widthAt(i) + widthAt(i + 1)) / 2
+            guard w > 0 else { continue }
             var seg = Path()
             seg.move(to: pts[i].offset(offset))
             seg.addLine(to: pts[i + 1].offset(offset))
-            let w = (widthAt(i) + widthAt(i + 1)) / 2
-            ctx.stroke(seg, with: .color(color), style: StrokeStyle(lineWidth: w, lineCap: .round))
+            ctx.stroke(seg, with: .color(colorAt(i)), style: StrokeStyle(lineWidth: w, lineCap: .round))
         }
     }
 
@@ -364,11 +408,20 @@ enum TerrainRenderer {
         let head = CGPoint(x: pin.position.x, y: pin.position.y - r * 1.7)
         let teardrop = teardropPath(tip: pin.position, headCenter: head, radius: r)
 
+        // §08 destination rule: the end destination's name chip ALWAYS shows,
+        // whatever its state; otherwise only the single "next" is statically
+        // labelled (reached labels appear on tap).
+        let showsChip = pin.state == .next || pin.isDestination
+
         // §08 "Waypoint & marker states": a further-unreached waypoint is outline
-        // only — 2pt dashed ink at 60%, no fill, no dot, and no name label.
+        // only — 2pt dashed ink at 60%, no fill, no dot. But if it's the
+        // destination, its chip still renders above the dashed outline.
         if pin.state == .upcoming {
             ctx.stroke(teardrop, with: .color(palette.ink.opacity(0.6)),
                        style: StrokeStyle(lineWidth: 2, lineJoin: .round, dash: [3, 3]))
+            if showsChip {
+                drawChip(pin.name, above: head, headRadius: r, into: &ctx, palette: palette)
+            }
             return
         }
 
@@ -392,9 +445,8 @@ enum TerrainRenderer {
                                          width: r * 0.64, height: r * 0.64))
         ctx.fill(dot, with: .color(palette.card))
 
-        // §08: there is ever exactly one "next," and it is the only waypoint whose
-        // name label is always shown (reached labels appear on tap, not statically).
-        if pin.state == .next {
+        // The "next" waypoint and the end destination both carry a static chip.
+        if showsChip {
             drawChip(pin.name, above: head, headRadius: r, into: &ctx, palette: palette)
         }
     }
@@ -424,29 +476,39 @@ enum TerrainRenderer {
 
     // MARK: - Shared facet & geometry helpers
 
-    /// Corner-clip facets for soft shapes (§07.1): a top-band highlight and a
-    /// bottom-band shadow clipped to the silhouette, leaving a base mid band — the
-    /// same three-tone read as the character rig's FacetPatch.
+    /// Corner-clip facets for soft shapes (§07.1): a top highlight facet and a
+    /// bottom shadow facet clipped to the silhouette, leaving a base mid band —
+    /// the same three-tone read as the character rig's FacetPatch. The two
+    /// facets' inner edges are NOT parallel full-width lines: the highlight's
+    /// lower edge and the shadow's upper edge cross near the right, so the visible
+    /// mid-tone seam is a thin band that TAPERS and pinches out before reaching
+    /// the shape's ends (the original kit's clip recipe), never a hard diagonal
+    /// running the whole length. Bounding-box fractions match the design PDF:
+    ///   highlight  polygon(0 0, 100% 0, 100% 42%, 0 66%)
+    ///   shadow     polygon(100% 38%, 100% 100%, 18% 100%, 0 74%)
     private static func cornerClipFacets(_ path: Path,
                                          into ctx: inout GraphicsContext,
                                          highlight: Color,
                                          shadow: Color) {
         let b = path.boundingRect
+        func p(_ fx: CGFloat, _ fy: CGFloat) -> CGPoint {
+            CGPoint(x: b.minX + b.width * fx, y: b.minY + b.height * fy)
+        }
         ctx.drawLayer { layer in
             layer.clip(to: path)
             var hl = Path()
-            hl.move(to: CGPoint(x: b.minX, y: b.minY))
-            hl.addLine(to: CGPoint(x: b.maxX, y: b.minY))
-            hl.addLine(to: CGPoint(x: b.maxX, y: b.minY + b.height * 0.34))
-            hl.addLine(to: CGPoint(x: b.minX, y: b.minY + b.height * 0.58))
+            hl.move(to: p(0, 0))
+            hl.addLine(to: p(1, 0))
+            hl.addLine(to: p(1, 0.42))
+            hl.addLine(to: p(0, 0.66))
             hl.closeSubpath()
             layer.fill(hl, with: .color(highlight))
 
             var sh = Path()
-            sh.move(to: CGPoint(x: b.maxX, y: b.maxY))
-            sh.addLine(to: CGPoint(x: b.minX, y: b.maxY))
-            sh.addLine(to: CGPoint(x: b.minX, y: b.maxY - b.height * 0.22))
-            sh.addLine(to: CGPoint(x: b.maxX, y: b.maxY - b.height * 0.47))
+            sh.move(to: p(1, 0.38))
+            sh.addLine(to: p(1, 1))
+            sh.addLine(to: p(0.18, 1))
+            sh.addLine(to: p(0, 0.74))
             sh.closeSubpath()
             layer.fill(sh, with: .color(shadow))
         }

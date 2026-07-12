@@ -88,17 +88,20 @@ enum TerrainSpecimenScene {
             ])
         ]
 
-        // 4 · Two rivers. One meanders from the range into the lake; one ends
-        // abruptly AT the coastline (§07.5 — never mid-land, never under the sea).
+        // 4 · Two rivers, both true confluences (Ruling 3). River 1 meanders from
+        // the range and MELTS into the lake's north shore (freshwater mouth);
+        // river 2 MELTS into the sea at the coastline (sea mouth). Neither caps:
+        // the renderer fades each dark bank out and runs the body — the same water
+        // token as the receiver — a short way in, so the join shows no seam.
         scene.rivers = [
             TerrainRiver(centerline: [
                 CGPoint(x: 150, y: 196), CGPoint(x: 176, y: 256), CGPoint(x: 134, y: 306),
                 CGPoint(x: 178, y: 360), CGPoint(x: 150, y: 410), CGPoint(x: 172, y: 462)
-            ], sourceWidth: 5, mouthWidth: 11),
+            ], sourceWidth: 5, mouthWidth: 11, mouth: .freshwater),
             TerrainRiver(centerline: [
                 CGPoint(x: 214, y: 178), CGPoint(x: 246, y: 240), CGPoint(x: 220, y: 300),
                 CGPoint(x: 262, y: 360), CGPoint(x: 244, y: 412), CGPoint(x: 296, y: 440)
-            ], sourceWidth: 5, mouthWidth: 12)
+            ], sourceWidth: 5, mouthWidth: 12, mouth: .sea)
         ]
 
         // 5 · Forests — a big one and a smaller one, both feathered masses.
@@ -118,16 +121,20 @@ enum TerrainSpecimenScene {
                                 feather: 0.45, rng: &rng)
         let cappedMountains = capTallest(mountains, count: 4)
 
-        // 7 · The dot-dash trek path, staying on land, meandering to the summit.
-        // It starts at the southern village (by the lake), swings WEST to clear the
-        // lake fill with margin (the smoothed Catmull-Rom leg stays x < 127 through
-        // the lake's y-band of 452–526, ≥11pt west of the lake's min x = 138), then
-        // climbs to Ember Spire. It never crosses the lake or the ocean (§07.5).
+        // 7 · The dot-dash trek path. Every waypoint pin is a CONTROL POINT of this
+        // polyline (Ruling 4), so — because Catmull-Rom passes exactly through its
+        // controls — each pin's teardrop tip sits precisely ON the smoothed curve.
+        // The three controls are Thistledown (155,556, start, by the lake's south
+        // shore), Crosswater (154,440, the ford where river 1 enters the lake), and
+        // Ember Spire (160,150, the summit). Between Thistledown and Crosswater the
+        // path swings WEST to clear the lake fill (x ≤ 118 through the lake's y-band
+        // 452–526, and its NW leg to the ford stays north of the lake's y≈452 top),
+        // so it never crosses the lake or the ocean (§07.5).
         scene.paths = [
             TerrainPath(points: [
-                CGPoint(x: 150, y: 566), CGPoint(x: 120, y: 520), CGPoint(x: 104, y: 452),
-                CGPoint(x: 126, y: 384), CGPoint(x: 150, y: 312), CGPoint(x: 140, y: 240),
-                CGPoint(x: 158, y: 176), CGPoint(x: 160, y: 150)
+                CGPoint(x: 155, y: 556), CGPoint(x: 118, y: 516), CGPoint(x: 100, y: 460),
+                CGPoint(x: 154, y: 440), CGPoint(x: 150, y: 382), CGPoint(x: 158, y: 312),
+                CGPoint(x: 142, y: 240), CGPoint(x: 158, y: 176), CGPoint(x: 160, y: 150)
             ], style: .trek)
         ]
 
@@ -142,18 +149,20 @@ enum TerrainSpecimenScene {
         // them into their §07.6 draw stages by kind.
         scene.glyphs = tufts + dunes + forest1 + forest2 + cappedMountains + village1 + village2
 
-        // 9 · Waypoint pins — original names only. The three exercise all §08
-        // marker states: Thistledown (the reached start, at the southern village
-        // by the lake), Crosswater (the single "next" — the only pin whose Cinzel
-        // name chip is always shown, plus its accent/reward ring), and Ember Spire
-        // (further-unreached — the dashed 60% outline).
+        // 9 · Waypoint pins — original names only, each sitting exactly on a trek
+        // control point (Ruling 4). The three exercise all §08 marker states:
+        // Thistledown (the reached start, by the lake's south shore), Crosswater
+        // (the single "next" — accent/reward ring + static chip — at the river
+        // ford), and Ember Spire (further-unreached: dashed 60% outline). Ember
+        // Spire is also the end DESTINATION, so its chip renders ALWAYS despite the
+        // upcoming state (Ruling 1) — dashed outline WITH the "Ember Spire" chip.
         scene.pins = [
             TerrainPin(position: CGPoint(x: 155, y: 556), name: "Thistledown",
                        accentToken: DesignToken.accentPrimary, state: .reached),
-            TerrainPin(position: CGPoint(x: 178, y: 452), name: "Crosswater",
+            TerrainPin(position: CGPoint(x: 154, y: 440), name: "Crosswater",
                        accentToken: DesignToken.accentSecondary, state: .next),
             TerrainPin(position: CGPoint(x: 160, y: 150), name: "Ember Spire",
-                       accentToken: DesignToken.reward, state: .upcoming)
+                       accentToken: DesignToken.reward, state: .upcoming, isDestination: true)
         ]
 
         return scene

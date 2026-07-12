@@ -65,9 +65,16 @@ struct TerrainBlob {
 /// times (bank / body / highlight ribbon) and tapers from `sourceWidth` at
 /// point 0 to `mouthWidth` at the last point, so it reads as flowing downstream.
 struct TerrainRiver {
+    /// How a river's mouth meets the water it drains into (§07.3.3). `inland`
+    /// rivers just taper to a point; `freshwater`/`sea` mouths MELT into the
+    /// receiving body — the renderer fades the dark bank out and runs the body
+    /// (same water token as the receiver) a short way in, so there's no seam. A
+    /// `sea` mouth additionally transitions the body toward the shallow band tone.
+    enum Mouth { case inland, freshwater, sea }
     var centerline: [CGPoint]
     var sourceWidth: CGFloat = 9
     var mouthWidth: CGFloat = 13
+    var mouth: Mouth = .inland
 }
 
 /// A coastline (§07.3.5). `coastline` is the true shore polyline; `seaward` is
@@ -119,6 +126,11 @@ struct TerrainPin {
     var name: String
     var accentToken: String
     var state: State
+    /// The journey's end destination. Its Cinzel name chip ALWAYS renders (§08
+    /// destination rule), regardless of reached/next/upcoming — while its pin
+    /// body still follows `state` (an unreached destination keeps the dashed 60%
+    /// outline, but with its chip above it). Used by the renderer only.
+    var isDestination: Bool = false
 }
 
 // MARK: - The scene
