@@ -253,6 +253,65 @@ Waypoints are **template content** (KAN-10) — shared by every instance, carryi
 
 **Out of scope for KAN-14:** backfilling historical crossings; year-rollup or richer duration phrasing; charts/graphs/trend lines; the trophy case; per-waypoint milestone notifications; km/locale unit switching (still deferred); steps-as-a-stat; real-world MapKit journey stats; any visual design (Jeff owns both screens' layout, mocked at Gate 2).
 
+## The fantasy map: faceted cartography system (epic KAN-16 — Decided, phased P1–P4)
+
+The fantasy-journey map is the app's signature surface. **KAN-7 already shipped a first, real version of it** (see the "Fantasy map + marker" row and "What's actually built today"): a parchment field with a dot-dash ink route, teardrop `WaypointPin`s, and Wren interpolated along the waypoint polyline by real distance. That map is deliberately simple — a handful of SwiftUI pin views over a procedural background, positioned by normalized 0…1 coordinates. The **faceted cartography system** described here is the *next* layer: the textured, faceted **terrain** the map is meant to have, the data it's authored from, the coordinate space it lives in, and a camera that can move over it. **None of this layer is built** — it is epic KAN-16, Decided and phased P1–P4.
+
+The **visual** style of the terrain — facet recipes, color triads, glyph sizes, the fixed back-to-front draw order — lives in `docs/DESIGN_SYSTEM.md`'s terrain & cartography section (Jeff owns it, and is porting it in parallel). This section owns the **behavior, data, and architecture** underneath that style: how a map is authored, what coordinate space it lives in, how it's drawn, and how the camera moves. Where the two meet they cross-reference; neither restates the other.
+
+Real-world journeys (Around the World, a specific trail) are a *separate* visualization and will use MapKit when built — see the Journey types row. Everything below is the **custom fantasy** renderer. Camera behavior (zoom, pan, framing) should feel consistent across both kinds of journey.
+
+**Decided: a map is authored as a short list of REGION records plus a deterministic seed — never as hand-placed glyphs.**
+
+A range, a forest, a river, a lake, a coastline, a village site are each one *region record* describing a shape and a few parameters (extent, density, jitter, edge feathering) in map units. A seeded procedural scatter generator expands those regions into the hundreds of tiny glyph placements the style calls for (a forest is dozens of scattered trees, a range is many small peaks, a village is a tight cluster of homes — the visual recipes are Jeff's).
+
+- *Trap:* authoring a map by placing individual glyphs by hand. It doesn't scale, it can't be re-tuned, and it can't be validated. Explicitly rejected.
+- *Mitigation:* author regions; generate glyphs.
+- **Determinism is a hard requirement.** The same regions + the same seed must produce identical placements on every launch and every device. The generator is a pure function of `(regions, seed)` — no wall-clock, no `Date()`, no unseeded RNG. A map that reshuffles between launches is a bug. This also lets the map stay stable across a user's iCloud devices without syncing any glyph positions: only the small authoring input travels, and each device regenerates the same map.
+
+**Decided: placement rules are build-time validators, not runtime conventions.**
+
+The design session fixed logical constraints on how terrain relates: rivers start off-screen or in mountains and terminate in a lake or at the coastline (never mid-land, never continuing under the ocean fill); roads and the trek path stay on land and never cross a lake or ocean; settlements sit near water (river bank, lake shore, coast). These are checked when a map is authored/generated, and a violation **fails authoring, not the render**.
+
+- *Trap:* checking these at runtime and drawing a "best-effort" broken map, or trusting authors to remember them.
+- *Mitigation:* a validator over the region set and its generated placement, so a map that breaks a rule is an authoring error the author fixes. The shipped map is correct by construction.
+
+**Decided: each fantasy journey has a fixed logical map-unit coordinate space; rendering applies one camera transform.**
+
+Waypoints, regions, and the trek path are all authored in *map units* — the journey's own logical coordinate space — not as a fraction of the screen. A map may be far larger than the screen. Rendering maps logical units → screen points through a single camera transform (translate + scale).
+
+- *Trap:* the coordinate space the shipped KAN-7 map uses. Today `JourneyMapView.swift` positions waypoints and pins as fractions of the container (`waypoint.positionX * geo.size.width`, `positionY * geo.size.height`), and `MarkerPositionCalculator` returns normalized 0…1 points. That normalized image-relative space is correct and sufficient for a *single-screen* pin-and-route map, but it can't zoom, can't exceed the screen, and ties layout to device size. A faceted map is far larger than one screen.
+- *Mitigation:* one map-unit space per fantasy journey (its bounds are journey data), one camera transform at draw time. **This extends and supersedes the normalized 0…1 space in P4** (below) — it is not a bug in KAN-7, it is the next coordinate model the terrain and camera require.
+
+**Decided: terrain is drawn in a single-pass SwiftUI `Canvas`, visible-rect culled; no per-glyph view hierarchy.**
+
+Hundreds of glyphs cannot each be a SwiftUI `View` — layout and diffing would collapse. The terrain is one `Canvas` that draws the generated glyphs in the design system's fixed back-to-front order, culling anything outside the current visible rect. Terrain is fully **static** — it does not animate and does not change once generated; only the marker and the camera move. So the generated glyph set is produced once per map (per LOD bucket) and redrawn cheaply.
+
+- *Trap:* a `ZStack`/`ForEach` of glyph views, or animating the terrain. (KAN-7's ~8 `WaypointPin`s as SwiftUI views are fine at that count and stay as an overlay above the terrain; the *terrain's* hundreds of glyphs are what must not become a view hierarchy.)
+- *Mitigation:* one culled `Canvas` pass for terrain; all motion lives in the marker and the camera.
+
+**Decided: the camera supports pinch-zoom and pan, defaults to a "chapter view," and thins density as it zooms out (LOD).**
+
+- Gesture: pinch zoom and pan, backed by `UIScrollView` (via a representable) for correct momentum, bounce, and zoom feel.
+- Default framing = **chapter view**: the current leg only (last waypoint reached → next waypoint), marker centered. A toggle switches to a **full-journey overview**.
+- **LOD:** as zoom decreases, each glyph's *on-screen* size stays roughly constant while the scatter *density* thins. Zooming out keeps masses reading as textured terrain — never collapsing to dust, never popping into a few large icons.
+- *Rationale — why the camera is not optional:* a day's walking is on the order of 0.2% of Ember Spire's 1,800 miles. Framed to the whole journey, a day's progress is sub-pixel and the marker never visibly moves — the core motivation loop dies. Chapter view makes daily progress legible. This is *why* the map-unit space and camera exist at all.
+
+**Decided: the map reads progress; it never owns or computes it.**
+
+This reinforces the Journey types row — and, unlike the other decisions here, **KAN-7's built map already satisfies it.** `MarkerPositionCalculator` is a pure function of the journey's distance-based progress (`distanceAccumulated` interpolated by each waypoint's real `distanceFromStart` in meters, per "The one assumption that matters most" and the Progress metric section). It reads progress, never writes it, and never touches HealthKit or steps. The faceted system **preserves that exactly**: the marker keeps interpolating by real distance; terrain simply draws around it. The map layer has no distance math of its own — no steps, no per-view constants.
+
+- *Note on the retired prototype:* the old `JourneyTest` map drove its marker off a step count plus a unitless distance literal, and split position evenly across waypoint indices. Both were bugs, both were fixed in KAN-7 (`MarkerPositionCalculator`'s header calls the even-split out by name), and neither is a pattern to reintroduce. This repo does **not** carry that drift.
+
+**Phased delivery — epic KAN-16.** Each phase is gated on Justin's visual approval before the next begins:
+
+- **P1** — a hand-placed `Canvas` specimen that proves the faceted look (one screen, static, no generator). Validates the aesthetic cheaply before building machinery. Hand-placement here is a deliberate one-off proof, not the authoring model.
+- **P2** — the seeded generator plus a **persistent** tuning harness: an authoring tool with live knobs for density, jitter, feather, and seed. The harness stays in the repo as the map-authoring surface; it is *not* throwaway like a `Mockups/` variant.
+- **P3** — camera, LOD, and performance: UIScrollView-backed zoom/pan, chapter-view framing, density-thinning LOD, `Canvas` culling.
+- **P4** — the real Ember Spire map, authored as regions + seed, replacing KAN-7's pin-and-route `JourneyMapView` surface: fantasy-journey waypoints move from normalized 0…1 to map units, positioned through the camera transform, with the terrain `Canvas` beneath the (unchanged, distance-driven) marker and pins.
+
+**Naming.** The design session's sample map used a placeholder proper noun lifted from a well-known source; it must **never** ship. All map content uses original names — see the naming section (Ember Spire, Thistledown, Crosswater, and the rest).
+
 ## Future-proofing checklist
 
 `Built` = exists in the code today. `Decided` = settled, not yet implemented — implement it this way when you get there. `Open` = still needs a call.
@@ -263,7 +322,8 @@ Waypoints are **template content** (KAN-10) — shared by every instance, carryi
 | **Progress metric** | Built (KAN-6) | — | Deriving distance from steps × stride | `distanceWalkingRunning` only; steps are a display stat. |
 | **Multiple journeys** | Built (KAN-6); split Built (KAN-10, PR #6) | User runs more than one journey, switches between them, keeps a history of completed ones | "There is only one journey, ever" (a singleton); *and* conflating catalog content with a user's run of it | Model as a list. KAN-10 splits this into `JourneyTemplate` (catalog) + `UserJourney` (instance) and replaces `isActive`/`isCompleted` with the `JourneyStatus` enum — see "Journey lifecycle & the catalog/instance split". |
 | **Multiple simultaneous journeys** | Built (KAN-6) | Yes — a user can run several journeys at once (e.g. Ember Spire and Around the World together) | Assuming only one journey can ever be "active" at a time | The delta-based update above: one shared "last processed distance" anchor, applied to every active journey's own accumulated total. |
-| **Fantasy map + marker** | Built (KAN-7; §04 rig marker KAN-9) | Real-world MapKit routes later | "Progress = marker position" baked into progress logic | Map screen *reads* `journey.progress` / waypoint distances and interpolates marker position; it never owns or writes progress. |
+| **Fantasy map + marker** | Built (KAN-7; §04 rig marker KAN-9) | Real-world MapKit routes later | "Progress = marker position" baked into progress logic | Map screen *reads* `journey.progress` / waypoint distances and interpolates marker position; it never owns or writes progress. Faceted terrain rendering is a separate Decided layer — see next row. |
+| **Fantasy map rendering (faceted terrain)** | Decided (epic KAN-16, P1–P4) | The signature faceted terrain; zoom/pan; more journeys later | Hand-placing glyphs; fractional-of-screen coordinates for a map larger than the screen; a per-glyph SwiftUI view hierarchy for hundreds of terrain glyphs | Author as region records + a deterministic seed; one logical map-unit space + a single camera transform; a single culled SwiftUI `Canvas` pass for terrain. Builds *around* KAN-7's already-correct distance-driven marker (row above), which it preserves. See "The fantasy map: faceted cartography system". |
 | **Journey types** | Decided | Fantasy illustrated path today; real-world MapKit routes later | Baking "progress = position on my custom image" into the core progress logic | Keep "distance accumulated" and "how that's visualized" as separate concerns. The map screen reads progress; it doesn't own it. |
 | **Activity data source** | Built (KAN-6) | Cycling, swimming, wheelchair distance, manual entry for offline days | Hardcoding "distance = HealthKit walking/running distance" deep in many places | Wrap HealthKit access in one small "distance provider." Everything else calls that, not HealthKit directly. |
 | **Units** | Built (KAN-6) | Users outside the US expecting km | Hardcoding "miles" into display strings | Store distance in **meters** internally, always. Format for display in one place based on locale. |
@@ -337,6 +397,8 @@ Views read `Image(journey.theme.backgroundImageName)`, `Color(journey.theme.acce
 
 **KAN-14 (built, on `feature/kan-14-journey-stats`; PR pending)** — Journey stats on the card + map, plus the first per-run waypoint-crossing timing. New `WaypointCrossing` model (V3, additive lightweight migration) written by `ProgressUpdater` inside the actor; `completedAt` / `pausedAt` / `accumulatedPausedSeconds` added to `UserJourney`; new `StatFormatter` (dates + durations) and `DistanceFormatter.milesPerDay`; pure `JourneyStatsCalculator`. Forward-only crossings, honest paused/completed freezing. See "Journey stats & waypoint crossings (KAN-14)" above.
 
+**KAN-16 (epic — Decided, not built)** — the faceted cartography system: region authoring + a deterministic seeded scatter generator + a persistent tuning harness, a map-unit coordinate space, a culled single-pass `Canvas` terrain renderer, and a chapter-view camera with density-thinning LOD. Phased P1–P4, each gated on Justin's visual approval. KAN-7's shipped pin-and-route `JourneyMapView` is the surface this extends (its distance-driven marker is preserved unchanged); none of the faceted-terrain layer, the generator, the map-unit space, or the camera exists yet. See "The fantasy map: faceted cartography system" above.
+
 ## What NOT to worry about yet
 
 To be precise about "database": a **local database is already part of the plan** — SwiftData (SQLite under the hood) runs entirely on the user's device and is the right home for journeys, characters, and progress data, with zero server involved. What to skip for now is a **backend/server database** — one running on the internet that many users' apps talk to over a network. That's only needed for cross-device sync beyond what iCloud offers for free, social features, or pushing new content without an app update. Journeys, characters, and progress all belong in SwiftData from day one; none of that requires a backend.
@@ -375,10 +437,15 @@ All properties need inline default values and optional relationships to stay Clo
 - CloudKit-safe: inline default on every stored property, optional relationship, no unique constraint. Written only by `ProgressUpdater` inside the `ProgressStore` actor. Never records a 0-mile (origin) waypoint. Forward-only — no historical backfill.
 
 **Waypoint**
-- `id`, `order`, `position` (image-relative x/y, or lat/long)
-- `distanceFromStart` — meters
+- `id`, `order`, `positionX` / `positionY` — **today** image-relative normalized (0…1, origin top-left) for fantasy maps (KAN-7); lat/long later for real-world. **KAN-16 P4** reinterprets a fantasy-journey waypoint's position as **map units** (the journey's own logical coordinate space — see "The fantasy map: faceted cartography system"), rendered through the camera transform rather than multiplied by container size. *Not* a fraction of the screen once P4 lands.
+- `distanceFromStart` — meters (unchanged across P4; the marker interpolates by this real distance, never by screen position)
 - `name`, `descriptionText` (for future notifications)
-- KAN-10: relationship back-reference becomes `template` (was `journey`)
+- KAN-10: relationship back-reference is `template` (was `journey`)
+
+**Map authoring data** (fantasy journeys only, KAN-16 — the input to the seeded scatter generator; **Decided, not built**)
+- the journey's map-unit `bounds` (its logical coordinate space) and a single scatter `seed`
+- an ordered list of **MapRegion** records: `kind` (range / forest / river / lake / coast / groundCover / settlement / road / **trekPath**), a shape spec in map units (blob or ellipse extent; river source→mouth; village site; path polyline), and scatter parameters (density, jitter, feather)
+- This is *static authored content*, not user-mutable state, and it is **deliberately NOT a CloudKit-synced SwiftData model** — unlike `UserJourney` / `WaypointCrossing` / `ProgressUpdate`. It travels as part of the bundled journey definition (JSON) alongside the `JourneyTemplate` catalog content; the generator expands it to glyphs deterministically at load. Nothing here changes as the user walks — only the marker's position moves (read from progress via `MarkerPositionCalculator`, or its P4 map-unit successor). Because the map is a pure function of `(regions, seed)`, iCloud devices regenerate an identical map without syncing any glyph positions: only the small authoring input needs to be present, and it ships as bundled content rather than synced state.
 
 **Character**
 - `id`, `name`, `assetName`, `descriptionText`
