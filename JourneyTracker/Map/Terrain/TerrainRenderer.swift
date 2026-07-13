@@ -47,7 +47,30 @@ enum TerrainRenderer {
         // top/bottom, sea corners past the right edge) can't bleed into the
         // letterbox on a canvas whose aspect isn't the authored one.
         context.clip(to: Path(b))
+        drawScene(scene, into: &context, palette: palette)
+    }
 
+    /// Draws an ALREADY-POSITIONED scene in the §07.6 back-to-front order, with no
+    /// transform of its own. The P1/P2 `render` above calls this after its
+    /// aspect-fit transform; the P3 camera entry calls it after projecting the
+    /// scene into screen space (`MapRenderPlanner`). One draw-order authority, two
+    /// coordinate sources.
+    ///
+    /// ocean/coast → ground cover (plains → dunes → marsh) → lakes → rivers →
+    /// forests → mountains → roads/trek path → settlements → labels/pins.
+    static func drawScene(_ scene: TerrainScene,
+                          into context: inout GraphicsContext,
+                          palette: TerrainPalette) {
+        drawTerrain(scene, into: &context, palette: palette)
+        drawPins(scene, into: &context, palette: palette)
+    }
+
+    /// Stages 1–8 (everything BELOW the labels/pins): the terrain proper. Split out
+    /// so the camera path can clip terrain to the authored bounds while drawing pins
+    /// (stage 9) under a different, viewport-only clip.
+    static func drawTerrain(_ scene: TerrainScene,
+                            into context: inout GraphicsContext,
+                            palette: TerrainPalette) {
         // 1 · Ocean / coast
         if let coast = scene.coast { drawCoast(coast, into: &context, palette: palette) }
 
@@ -74,9 +97,58 @@ enum TerrainRenderer {
 
         // 8 · Settlements
         for home in scene.glyphs(.home) { drawHome(home, into: &context, palette: palette) }
+    }
 
-        // 9 · Labels / pins
+    /// Stage 9 (labels / pins). UI drawn ABOVE all terrain (§07.6) — in the camera
+    /// path this runs OUTSIDE the terrain bounds clip so a destination chip near
+    /// the map edge is never clipped away (Justin's "destination always labeled").
+    static func drawPins(_ scene: TerrainScene,
+                         into context: inout GraphicsContext,
+                         palette: TerrainPalette) {
         for pin in scene.pins { drawPin(pin, into: &context, palette: palette) }
+    }
+
+    // MARK: - Camera entry (P3, KAN-20)
+
+    /// Draws `scene` through `camera` into `viewport`: projects + culls + LOD-thins
+    /// via `MapRenderPlanner`, then draws the screen-space result. Returns the
+    /// plan's stats (drawn / culled / thinned counts) for the perf overlay. This
+    /// is the entry the P3 surfaces use; the P1 specimen / P2 harness keep calling
+    /// the aspect-fit `render(_:into:size:palette:)` above, unchanged.
+    @discardableResult
+    static func render(_ scene: TerrainScene,
+                       into context: inout GraphicsContext,
+                       viewport: CGSize,
+                       camera: MapCamera,
+                       milesPerMapUnit: Double = 0,
+                       palette: TerrainPalette,
+                       lod: MapLOD = MapLOD()) -> TerrainRenderStats {
+        let (projected, stats) = MapRenderPlanner.plan(scene, camera: camera, viewport: viewport,
+                                                       milesPerMapUnit: milesPerMapUnit, lod: lod)
+        drawPlanned(projected, into: &context, viewport: viewport, palette: palette)
+        return stats
+    }
+
+    /// Draws an already-planned (screen-space) scene — lets a view compute the
+    /// plan once (to read its stats) and hand the result straight to the Canvas.
+    /// TERRAIN is clipped to the projected authored bounds so off-map overflow
+    /// can't bleed into the letterbox; PINS/labels then draw over it clipped to the
+    /// viewport ONLY, so a destination chip near the map edge is never a victim of
+    /// the terrain clip (§07.6: pins are UI above all terrain).
+    static func drawPlanned(_ projected: TerrainScene,
+                            into context: inout GraphicsContext,
+                            viewport: CGSize,
+                            palette: TerrainPalette) {
+        let viewportRect = CGRect(origin: .zero, size: viewport)
+        let boundsClip = projected.bounds.intersection(viewportRect)
+        context.drawLayer { layer in
+            layer.clip(to: Path(boundsClip.isNull ? viewportRect : boundsClip))
+            drawTerrain(projected, into: &layer, palette: palette)
+        }
+        context.drawLayer { layer in
+            layer.clip(to: Path(viewportRect))
+            drawPins(projected, into: &layer, palette: palette)
+        }
     }
 
     // MARK: - Mountains (§07.3.1)
