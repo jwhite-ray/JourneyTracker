@@ -165,6 +165,27 @@ enum MapGeometry {
         hypot(a.x - b.x, a.y - b.y)
     }
 
+    /// The point at `arcLength` map units along a polyline (linearly between
+    /// vertices). Clamps to the ends. Used to place a marker / bracket a leg by
+    /// real mileage on the SAMPLED trek curve (arc length ↔ mileage, App Concept
+    /// doc). Pure — the camera's chapter framing reads it, never HealthKit.
+    static func pointAtArcLength(_ pts: [CGPoint], arcLength: CGFloat) -> CGPoint {
+        guard let first = pts.first else { return .zero }
+        guard pts.count > 1, arcLength > 0 else { return first }
+        var remaining = arcLength
+        for i in 1..<pts.count {
+            let seg = dist(pts[i - 1], pts[i])
+            if seg <= 0 { continue }
+            if remaining <= seg {
+                let t = remaining / seg
+                return CGPoint(x: pts[i - 1].x + (pts[i].x - pts[i - 1].x) * t,
+                               y: pts[i - 1].y + (pts[i].y - pts[i - 1].y) * t)
+            }
+            remaining -= seg
+        }
+        return pts[pts.count - 1]
+    }
+
     /// Shortest distance from `p` to a polyline (its nearest segment).
     static func distanceToPolyline(_ p: CGPoint, _ pts: [CGPoint]) -> CGFloat {
         guard pts.count > 1 else { return pts.first.map { dist($0, p) } ?? .infinity }

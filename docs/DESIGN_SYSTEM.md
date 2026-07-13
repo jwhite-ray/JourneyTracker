@@ -1,4 +1,4 @@
-# JourneyTracker — Design System v1.7
+# JourneyTracker — Design System v1.8
 
 **Status:** living document · owned by Jeff (design) · iOS · SwiftUI
 **Scope:** this document passes **style only** — color, type, shape, layout, the character rig, and the faceted terrain/cartography system. It does not define behavior, data models, units, or progress math. Those live in `docs/JourneyTracker_App_Concept.md`, which wins on any such question.
@@ -20,6 +20,8 @@ Every step you walk carries a wayfarer closer to the summit along the 1,800-mile
 > **v1.6 change log.** Ported §07, Terrain & cartography — the visual vocabulary for rendering authored map regions (mountains, forests, rivers, lakes, ocean/coast, ground cover, trek path/roads, settlements) as faceted SwiftUI Canvas art, plus eight new `terrain/*` color tokens (merged into §02). This is Jira KAN-17, Phase 0 of the Faceted Map System epic, approved in a prior design pass and integrated here without redesign. §06 (Journey map) now points to §07 rather than duplicating its rendering detail, the same way it will once real terrain art ships. Because §07 was newly inserted, everything that followed it shifts down one: the section formerly called "§07 Core components" (and every changelog entry above referencing it by that number) is now **§08**, "§08 Layout tokens" is now **§09**, and "§09 Developer handoff notes" is now **§10**. Internal cross-references inside those sections were updated to match; the two places the approved terrain text pointed at "the button treatment" for its hard offset shadow were re-anchored to the §09 Layout-tokens hard-drop-shadow token instead, since buttons themselves lost their drop shadow in KAN-8 (§08) and no longer have one to borrow from.
 
 > **v1.7 change log.** Codified four visual rulings Justin made at the KAN-18 Gate 1 render review (Phase 1 of the Faceted Map System epic), amending §07 (Terrain & cartography) and §08 (Core components) to match what Dan's `TerrainRenderer` / `TerrainGlyph` / `TerrainPalette` already draw on this branch: **(1)** the journey's destination waypoint now always shows its Cinzel name chip in every state — reached, next, or further-unreached — not only when it happens to be reached or "next." This **replaces** the prior §08 rule that "next" was the only waypoint always labelled; that wording is gone, not left alongside the new one. **(2)** The soft-form facet recipe (§07.1, and by reference §07.3.4 Lakes) is corrected to match the design PDF: the highlight/shadow clip is a thin, TAPERING mid-tone seam with non-parallel inner edges that pinches to zero before the far end of the shape — not a full-width hard diagonal. The exact bounding-box-fraction clip polygons Dan implemented are now documented. **(3)** River mouths now melt into the lake or ocean they drain into (§07.3.3, §07.5): the dark bank stroke tapers out before the receiving water and never caps across it, the body runs on into the receiver at the same water tone so fill continuity does the joining, and a sea mouth additionally blends toward the shallow-band tone — no hard edge, cap, or seam at any confluence. **(4)** One visual-grammar sentence added to §07.5: waypoint pins sit on the trek path line itself (the teardrop tip anchors to it), never floating beside it — Jake owns the underlying data rule in the App Concept doc; this is that rule's visual expression.
+
+> **v1.8 change log.** Added §07.7 "World-edge border" (Gate 3 ruling, KAN-20): when the camera can see the authored world's edge, its bounds are traced with a visible border line — 3pt ink, matching the map-frame linework in §09 — drawn above terrain and below pins/chips, with the world edge itself ruled **square-cornered** (distinct from the UI map frame's 18pt radius). Outside the line is bare parchment letterbox, no terrain. Former §07.7 "Handoff notes" is renumbered §07.8; nothing in it changed.
 
 ---
 
@@ -231,11 +233,21 @@ These are visual grammar — how elements relate to each other on the page — n
 
 Back to front, always, no exceptions:
 
-**ocean/coast → ground cover (plains/dunes/marsh) → lakes → rivers → forests → mountains → roads/trek path → settlements → labels/pins**
+**ocean/coast → ground cover (plains/dunes/marsh) → lakes → rivers → forests → mountains → roads/trek path → settlements → world-edge border → labels/pins**
 
 Respecting this order is what lets a map be an unordered bag of region records with no per-element z-index to maintain — draw them in this sequence and it's always correct.
 
-### 07.7 · Handoff notes
+### 07.7 · World-edge border (Gate 3 ruling, KAN-20)
+
+When the camera can see the edge of the authored world — the full-journey overview, or a pan that reaches a map boundary — trace the authored bounds with a visible border line, so the world's edge reads as a deliberate edge of the page, not terrain that simply runs out. This is linework, styled to match the existing frame language rather than inventing a new stroke: same weight and token as the map frame in §09 — **3pt `ink` border**. The UI map frame's **18pt radius belongs to that frame** (the rounded chrome around the map viewport), not to this line. The world edge itself is **square-cornered**: the authored world is an authored rectangle of content, not a rounded card, and a hard corner reads as "the drawn world stops here," legible as a distinct thing from the rounded UI viewport it sits inside.
+
+Draw order: above every terrain element in §07.6's sequence (last, after settlements) and below labels/pins — waypoint pins and their chips still draw on top of everything, including this line, per §07.5/§07.6.
+
+Outside the line is bare `bg/parchment` letterbox — no terrain, no fill, nothing rendered. The renderer already clips terrain to the authored bounds; this border only makes that existing clip edge visible.
+
+**Deepdark.** Like the trek path and every other piece of terrain linework, the border is drawn in the `ink` token — it inverts with the rest of Deepdark's linework (§02) automatically, never a fixed literal.
+
+### 07.8 · Handoff notes
 
 **Rendering.** SwiftUI `Canvas` draw passes only — shape stacks per glyph, not a view per glyph. A forest of 40 conifers is 40 small `Path` fills inside one `Canvas`, never 40 `ConiferView` instances in a `ForEach`.
 

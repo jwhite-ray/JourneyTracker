@@ -24,6 +24,7 @@ struct DebugView: View {
                 advisorySection
                 journeysSection
                 anchorSection
+                mapFixtureValidationSection
                 actionsSection
             }
             .navigationTitle("HealthKit Debug")
@@ -139,7 +140,81 @@ struct DebugView: View {
                 MapTuningHarnessView()
             }
             .accessibilityIdentifier("debug.mapTuningHarness")
+
+            // KAN-20 (P3) camera / LOD / culling. The calm static "journey view"
+            // at chapter framing, with an expand button to the gesture surface.
+            NavigationLink("Journey view (static, KAN-20)") {
+                StaticJourneyMapView(presentation: Self.samplePresentation,
+                                     fullScreenPerfOverlay: true)
+                    .navigationTitle("Journey view")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+            .accessibilityIdentifier("debug.journeyViewStatic")
+
+            // KAN-20 (P3) Ember Spire-scale (1,800 mi) stress fixture, opened
+            // straight into the full-screen gesture surface with the perf overlay.
+            NavigationLink("Ember Spire scale test (KAN-20)") {
+                FullScreenMapView(presentation: Self.stressPresentation,
+                                  initialFraming: .overview,
+                                  showsPerfOverlay: true)
+                    .toolbar(.hidden, for: .navigationBar)
+            }
+            .accessibilityIdentifier("debug.emberSpireScale")
         }
+    }
+
+    // MARK: KAN-20 debug map presentations (generated + VALIDATED once)
+
+    /// The ~30-mile P2 sample map, marker part-way along the first leg.
+    private static let sampleAuthoring = SampleJourneyMap.make()
+    private static let sampleViolations = MapValidator.validate(sampleAuthoring)
+    private static let samplePresentation = JourneyMapPresentation(
+        authoring: sampleAuthoring,
+        scene: MapGenerator.generateUnchecked(sampleAuthoring),
+        markerMiles: 5.0)
+
+    /// The 1,800-mile debug stress fixture (not shipping content).
+    private static let stressAuthoring = EmberSpireScaleFixture.make()
+    private static let stressViolations = MapValidator.validate(stressAuthoring)
+    private static let stressPresentation = JourneyMapPresentation(
+        authoring: stressAuthoring,
+        scene: MapGenerator.generateUnchecked(stressAuthoring),
+        markerMiles: EmberSpireScaleFixture.defaultMarkerMiles)
+
+    /// The KAN-20 fixtures build via `generateUnchecked`, so this section makes the
+    /// "passes validators" claim REAL: a red row (and a debug assertion) surfaces
+    /// any regression instead of silently shipping a broken map.
+    @ViewBuilder
+    private var mapFixtureValidationSection: some View {
+        Section("Map fixtures (KAN-20)") {
+            fixtureValidationRow("Sample leg (~30 mi)", Self.sampleViolations,
+                                 identifier: "debug.mapFixture.sample")
+            fixtureValidationRow("Ember Spire scale (1,800 mi)", Self.stressViolations,
+                                 identifier: "debug.mapFixture.stress")
+        }
+    }
+
+    @ViewBuilder
+    private func fixtureValidationRow(_ name: String, _ violations: [MapViolation],
+                                      identifier: String) -> some View {
+        let ok = violations.isEmpty
+        VStack(alignment: .leading, spacing: 2) {
+            HStack {
+                Text(name)
+                Spacer()
+                Label(ok ? "PASS" : "\(violations.count) FAIL",
+                      systemImage: ok ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
+                    .foregroundStyle(Color(token: ok ? DesignToken.reward : DesignToken.alert))
+                    .accessibilityIdentifier(identifier)
+            }
+            .font(.subheadline)
+            ForEach(violations) { v in
+                Text(v.message)
+                    .font(.footnote)
+                    .foregroundStyle(Color(token: DesignToken.alert))
+            }
+        }
+        .onAppear { assert(ok, "\(name) failed map validators: \(violations.map(\.message))") }
     }
 
     // MARK: Helpers
