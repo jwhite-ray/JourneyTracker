@@ -24,6 +24,10 @@ struct FullScreenMapView: View {
 
     @StateObject private var controller: MapCameraController
     @State private var framing: MapFraming
+    /// Rolling frame/plan timing for the perf overlay. A reference type held in
+    /// `@State` so recording a sample (in `body`, per frame) never itself triggers a
+    /// SwiftUI invalidation — the overlay reads it on its own 4 Hz clock (KAN-24).
+    @State private var perf = MapPerfTracker()
 
     init(presentation: JourneyMapPresentation,
          initialFraming: MapFraming = .chapter,
@@ -40,16 +44,31 @@ struct FullScreenMapView: View {
     var body: some View {
         GeometryReader { geo in
             let size = geo.size
-            let t0 = CFAbsoluteTimeGetCurrent()
+            // Time the plan ONLY when the perf overlay is on — production builds pay
+            // nothing for the timing/recording (KAN-24, Rooster nit 5).
+            let t0 = showsPerfOverlay ? CFAbsoluteTimeGetCurrent() : 0
             // Only build a plan once the scroll view has published a real camera —
             // otherwise the placeholder camera flashes an extreme zoom for a frame.
+            // The plan uses the presentation's precomputed geometry cache (KAN-24),
+            // so it only projects + culls + LOD-thins — no per-frame smoothing or
+            // sea-polygon probing.
             let plan = controller.isReady
                 ? MapRenderPlanner.plan(presentation.scene,
+                                        geometry: presentation.geometry,
                                         camera: controller.camera,
                                         viewport: size,
                                         milesPerMapUnit: presentation.milesPerMapUnit)
                 : nil
-            let buildMs = (CFAbsoluteTimeGetCurrent() - t0) * 1000
+            // Record plan time + frame interval + the latest stats/zoom into the
+            // tracker. `body` re-evaluates once per camera change (≈ once per rendered
+            // frame during a gesture), so the delta between records is a rough frame
+            // interval. This only mutates the reference tracker (never invalidates the
+            // view); the overlay reads a snapshot on its own 4 Hz clock, so its text
+            // never depends on per-frame values.
+            let _ = (showsPerfOverlay ? plan : nil).map {
+                perf.record(planMs: (CFAbsoluteTimeGetCurrent() - t0) * 1000,
+                            stats: $0.stats, zoom: controller.camera.zoom, now: t0)
+            }
 
             ZStack(alignment: .top) {
                 Color(token: DesignToken.parchment)
@@ -67,8 +86,8 @@ struct FullScreenMapView: View {
 
                 controls(size: size)
 
-                if showsPerfOverlay, let plan {
-                    perfOverlay(stats: plan.stats, buildMs: buildMs)
+                if showsPerfOverlay, plan != nil {
+                    perfOverlay()
                         .frame(maxHeight: .infinity, alignment: .bottom)
                 }
             }
@@ -99,20 +118,66 @@ struct FullScreenMapView: View {
         .padding(.top, 12)
     }
 
-    private func perfOverlay(stats: TerrainRenderStats, buildMs: Double) -> some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(String(format: "build %.2f ms · zoom %.3f pt/u", buildMs, controller.camera.zoom))
-            Text("scatter: drawn \(stats.drawnScatter) · culled \(stats.culledScatter) · thinned \(stats.thinnedScatter) · pool \(stats.totalScatter)")
-            Text("homes \(stats.drawnHomes) · water \(stats.drawnWaterShapes) · paths \(stats.drawnPaths) · pins \(stats.drawnPins)")
+    private func perfOverlay() -> some View {
+        // Refresh the numbers on a 4 Hz clock — NOT once per rendered frame — so the
+        // overlay's text layout never becomes part of the gesture's hot path (KAN-24).
+        // Everything shown is read from the tracker snapshot (stats/zoom included), so
+        // the closure captures no per-frame value.
+        TimelineView(.periodic(from: .now, by: 0.25)) { _ in
+            let s = perf.snapshot()
+            let stats = s.stats
+            VStack(alignment: .leading, spacing: 2) {
+                Text(String(format: "plan %.2f ms · frame ~%.1f ms (%.0f fps) · zoom %.3f pt/u",
+                            s.planMs, s.frameMs, s.fps, s.zoom))
+                Text("scatter: drawn \(stats.drawnScatter) · culled \(stats.culledScatter) · thinned \(stats.thinnedScatter) · pool \(stats.totalScatter)")
+                Text("homes \(stats.drawnHomes) · water \(stats.drawnWaterShapes) · paths \(stats.drawnPaths) · pins \(stats.drawnPins)")
+            }
+            .font(.system(size: 11, weight: .medium, design: .monospaced))
+            .foregroundStyle(Color(token: DesignToken.ink))
+            .padding(10)
+            .background(Color(token: DesignToken.card).opacity(0.92), in: RoundedRectangle(cornerRadius: 10))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(token: DesignToken.ink), lineWidth: 2))
+            .padding(.horizontal, 16)
+            .padding(.bottom, 20)
+            .accessibilityIdentifier("map.perfOverlay")
         }
-        .font(.system(size: 11, weight: .medium, design: .monospaced))
-        .foregroundStyle(Color(token: DesignToken.ink))
-        .padding(10)
-        .background(Color(token: DesignToken.card).opacity(0.92), in: RoundedRectangle(cornerRadius: 10))
-        .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(token: DesignToken.ink), lineWidth: 2))
-        .padding(.horizontal, 16)
-        .padding(.bottom, 20)
-        .accessibilityIdentifier("map.perfOverlay")
+    }
+}
+
+/// Rolling plan-time / frame-interval tracker for the perf overlay (KAN-24). A
+/// reference type: `record` is called from `body` per frame but mutates only this
+/// object, so it never invalidates SwiftUI; the overlay samples it on a 4 Hz clock.
+/// `frameMs` is an exponential moving average of the interval between successive
+/// records (≈ the rendered frame interval during a gesture), so a smooth gesture
+/// reads near the display's frame time and a stalling one reads high.
+final class MapPerfTracker {
+    private var lastRecord: CFAbsoluteTime = 0
+    private var emaFrameMs: Double = 0
+    private var lastPlanMs: Double = 0
+    private var lastStats = TerrainRenderStats()
+    private var lastZoom: CGFloat = 0
+
+    struct Snapshot { var planMs: Double; var frameMs: Double; var fps: Double
+                      var zoom: CGFloat; var stats: TerrainRenderStats }
+
+    func record(planMs: Double, stats: TerrainRenderStats, zoom: CGFloat, now: CFAbsoluteTime) {
+        lastPlanMs = planMs
+        lastStats = stats
+        lastZoom = zoom
+        if lastRecord > 0 {
+            let dt = (now - lastRecord) * 1000
+            // Ignore long idle gaps (no gesture) so the average reflects active frames.
+            if dt > 0, dt < 250 {
+                emaFrameMs = emaFrameMs == 0 ? dt : emaFrameMs * 0.8 + dt * 0.2
+            }
+        }
+        lastRecord = now
+    }
+
+    func snapshot() -> Snapshot {
+        let fps = emaFrameMs > 0 ? min(120, 1000 / emaFrameMs) : 0
+        return Snapshot(planMs: lastPlanMs, frameMs: emaFrameMs, fps: fps,
+                        zoom: lastZoom, stats: lastStats)
     }
 }
 

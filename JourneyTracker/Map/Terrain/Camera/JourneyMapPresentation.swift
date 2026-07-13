@@ -19,6 +19,11 @@ import CoreGraphics
 struct JourneyMapPresentation {
     let authoring: MapAuthoring
     let scene: TerrainScene
+    /// The scene's geometry cache (KAN-24): the smoothed sea polygons, coast seaward
+    /// normals, river shore truncations, and per-home sea test, derived ONCE here so
+    /// the camera's per-frame `MapRenderPlanner.plan` only projects + culls + thins.
+    /// A pure derivation of `scene` — same scene ⇒ identical cache on every launch.
+    let geometry: MapSceneGeometry
     /// The marker's position along the journey, in real miles from the start.
     var markerMiles: Double
 
@@ -29,6 +34,7 @@ struct JourneyMapPresentation {
     init(authoring: MapAuthoring, scene: TerrainScene, markerMiles: Double) {
         self.authoring = authoring
         self.scene = scene
+        self.geometry = MapSceneGeometry(scene)
         self.markerMiles = markerMiles
         self.sampledTrek = MapGeometry.catmullRomSampled(authoring.trekPath?.points ?? [])
     }
