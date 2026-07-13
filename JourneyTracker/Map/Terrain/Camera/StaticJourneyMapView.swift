@@ -31,7 +31,8 @@ struct StaticJourneyMapView: View {
             let camera = presentation.chapterCamera(viewport: size)
             // On a long journey the fixed chapter zoom is itself high-altitude, so
             // the size taper applies here too (item 8).
-            let plan = MapRenderPlanner.plan(presentation.scene, camera: camera, viewport: size,
+            let plan = MapRenderPlanner.plan(presentation.scene, geometry: presentation.geometry,
+                                             camera: camera, viewport: size,
                                              milesPerMapUnit: presentation.milesPerMapUnit)
 
             ZStack(alignment: .bottomTrailing) {

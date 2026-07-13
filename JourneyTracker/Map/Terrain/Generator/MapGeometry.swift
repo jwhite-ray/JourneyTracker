@@ -263,6 +263,50 @@ enum MapGeometry {
         return bestArc
     }
 
+    // MARK: - Shore truncation (river mouths)
+
+    /// Truncates a river centerline at the receiving water's shore: cuts off the
+    /// tail that runs inside `ring` (a smoothed ring / sea polygon) and ends the
+    /// line exactly at the shore crossing nearest the mouth. If the mouth isn't
+    /// inside the receiver the line is returned unchanged. Pure geometry —
+    /// deterministic, and affine-covariant so truncating in map space then
+    /// projecting is identical to truncating the projected line (KAN-24).
+    static func truncatedAtShore(_ line: [CGPoint], inside ring: [CGPoint]) -> [CGPoint] {
+        guard line.count >= 2, ring.count >= 3, let mouth = line.last,
+              polygonContains(mouth, ring) else { return line }
+        var idx = line.count - 1
+        while idx >= 0, polygonContains(line[idx], ring) { idx -= 1 }
+        guard idx >= 0, idx < line.count - 1 else { return line }
+        let cross = segmentPolylineEntry(line[idx], line[idx + 1], ring) ?? line[idx + 1]
+        return Array(line[0...idx]) + [cross]
+    }
+
+    /// The first point (smallest t along a→b) where segment a→b crosses the closed
+    /// polygon `ring`, or nil if it doesn't.
+    static func segmentPolylineEntry(_ a: CGPoint, _ b: CGPoint, _ ring: [CGPoint]) -> CGPoint? {
+        var bestT = CGFloat.greatestFiniteMagnitude
+        for i in 0..<ring.count {
+            let c = ring[i], d = ring[(i + 1) % ring.count]
+            if let t = segmentIntersectionT(a, b, c, d), t < bestT { bestT = t }
+        }
+        guard bestT <= 1 else { return nil }
+        return CGPoint(x: a.x + (b.x - a.x) * bestT, y: a.y + (b.y - a.y) * bestT)
+    }
+
+    /// Parametric t along a→b at which it crosses segment c→d, or nil.
+    static func segmentIntersectionT(_ a: CGPoint, _ b: CGPoint,
+                                     _ c: CGPoint, _ d: CGPoint) -> CGFloat? {
+        let r = CGVector(dx: b.x - a.x, dy: b.y - a.y)
+        let s = CGVector(dx: d.x - c.x, dy: d.y - c.y)
+        let denom = r.dx * s.dy - r.dy * s.dx
+        guard abs(denom) > 1e-9 else { return nil }
+        let qp = CGVector(dx: c.x - a.x, dy: c.y - a.y)
+        let t = (qp.dx * s.dy - qp.dy * s.dx) / denom
+        let u = (qp.dx * r.dy - qp.dy * r.dx) / denom
+        guard t >= 0, t <= 1, u >= 0, u <= 1 else { return nil }
+        return t
+    }
+
     /// Even-odd point-in-polygon (ray cast). Used to test river mouths against
     /// lakes and paths against lake fills.
     static func polygonContains(_ p: CGPoint, _ ring: [CGPoint]) -> Bool {
