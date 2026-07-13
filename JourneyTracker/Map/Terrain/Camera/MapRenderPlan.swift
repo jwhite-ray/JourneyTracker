@@ -171,22 +171,51 @@ enum MapRenderPlanner {
                 stats.drawnWaterShapes += 1
             }
         }
+        // Lakes: keep the map-space smoothed ring (for river-mouth containment) and
+        // the projected ring/bbox (for mouth fitting + the altitude home-over-water
+        // skip), then emit the culled projected blob.
+        struct ProjLake { let mapSmoothed: [CGPoint]; let projRing: [CGPoint]; let projBox: CGRect }
+        var projLakes: [ProjLake] = []
         for lake in scene.lakes {
-            let ring = lake.ring.map(P)
-            if boundingBox(ring).intersects(shapePad) {
-                out.lakes.append(TerrainBlob(ring: ring))
+            let projRing = lake.ring.map(P)
+            let box = boundingBox(projRing)
+            projLakes.append(ProjLake(mapSmoothed: MapGeometry.catmullRomSampledClosed(lake.ring),
+                                      projRing: projRing, projBox: box))
+            if box.intersects(shapePad) {
+                out.lakes.append(TerrainBlob(ring: projRing))
                 stats.drawnWaterShapes += 1
             }
         }
+        // The projected sea polygon (for the home-over-water skip).
+        var projSea: [CGPoint] = []
+        if let coast = scene.coast {
+            projSea = MapGeometry.seaPolygon(coastline: coast.coastline, seaCorners: coast.seaCorners).map(P)
+        }
+
         for river in scene.rivers {
             let line = river.centerline.map(P)
-            // River widths taper with altitude so they never become highway bands.
-            let mw = river.mouthWidth * sizeMul
+            // Widths taper with altitude so a river never becomes a highway band.
+            var mw = river.mouthWidth * sizeMul
+            let sw = river.sourceWidth * sizeMul
+            // The melt run-in is SCALE-AWARE (∝ the tapered width) instead of a
+            // fixed 12 map units — the map-space overshoot that floated/overshot a
+            // tiny far-zoom lake. For a freshwater mouth we additionally CLAMP the
+            // mouth stroke and run-in to the receiving lake's PROJECTED inradius, so
+            // the river always terminates INSIDE its lake, never poking past — even
+            // when the lake projects smaller than the untapered stroke.
+            var runIn = mw
+            if river.mouth == .freshwater, let mouthMap = river.centerline.last,
+               let lake = projLakes.first(where: { MapGeometry.polygonContains(mouthMap, $0.mapSmoothed) }) {
+                let projMouth = P(mouthMap)
+                let inradius = lake.projRing.reduce(CGFloat.greatestFiniteMagnitude) {
+                    min($0, MapGeometry.dist(projMouth, $1))
+                }
+                mw = min(mw, max(1.0, 1.2 * inradius))
+                runIn = min(mw, 0.5 * inradius)
+            }
             if boundingBox(line).insetBy(dx: -mw, dy: -mw).intersects(shapePad) {
-                out.rivers.append(TerrainRiver(centerline: line,
-                                               sourceWidth: river.sourceWidth * sizeMul,
-                                               mouthWidth: mw,
-                                               mouth: river.mouth))
+                out.rivers.append(TerrainRiver(centerline: line, sourceWidth: min(sw, mw),
+                                               mouthWidth: mw, mouth: river.mouth, meltRunIn: runIn))
                 stats.drawnWaterShapes += 1
             }
         }
@@ -223,6 +252,16 @@ enum MapRenderPlanner {
             : min(1, target / (sceneDensity * clampedArea))
         stats.keepFraction = keepFraction
 
+        // At altitude (taper active) a home's projected footprint can visually spill
+        // into a tiny lake/sea even though the generator kept its base dry in map
+        // space — so drop such a home. Deterministic (pure function of camera).
+        let taperActive = sizeMul < 0.999
+        func homeOverWater(footprint: CGRect, base: CGPoint) -> Bool {
+            if projLakes.contains(where: { $0.projBox.intersects(footprint) }) { return true }
+            if !projSea.isEmpty, MapGeometry.polygonContains(base, projSea) { return true }
+            return false
+        }
+
         var inViewHomes: [TerrainGlyph] = []
         for glyph in scene.glyphs {
             let mass = MapLOD.thins(glyph.kind)
@@ -244,6 +283,9 @@ enum MapRenderPlanner {
                 // stable across zoom/pan (the taper changes size, never membership).
                 if MapLOD.keepRank(for: glyph) < keepFraction { out.glyphs.append(projected) }
             } else {
+                if taperActive,
+                   homeOverWater(footprint: CGRect(x: base.x - w / 2, y: base.y - h, width: w, height: h),
+                                 base: base) { continue }
                 inViewHomes.append(projected)
             }
         }

@@ -103,13 +103,18 @@ struct JourneyMapPresentation {
         MapCamera.fullJourney(bounds: authoring.bounds, in: viewport, padding: padding)
     }
 
-    /// Min zoom = full-journey fit; max zoom = 2× chapter detail (Justin's ruling).
+    /// Min zoom = full-journey fit. Max zoom lets the user dive until the map hits
+    /// the DESIGN REFERENCE scale (ptPerMile == referencePtPerMile, where the size
+    /// taper reaches 1.0 and the map shows full approved-chapter detail) — or the
+    /// 2× chapter cap, whichever is deeper (KAN-20 Gate 3). On a long journey the
+    /// reference is a deep dive; capping there prevents glyphs exceeding authored
+    /// sizes (the taper is min-clamped at 1.0 anyway).
     func zoomBounds(viewport: CGSize) -> (min: CGFloat, max: CGFloat) {
         let overview = overviewCamera(viewport: viewport).zoom
         let chapter = chapterCamera(viewport: viewport).zoom
-        // Guard against a degenerate ordering on tiny/edge viewports.
         let lo = min(overview, chapter)
-        let hi = max(overview, chapter) * 2
+        let referenceZoom = MapLOD().referencePtPerMile * CGFloat(max(milesPerMapUnit, 0))
+        let hi = max(max(overview, chapter) * 2, referenceZoom)
         return (lo, max(hi, lo * 1.0001))
     }
 }

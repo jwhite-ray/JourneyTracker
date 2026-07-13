@@ -145,6 +145,16 @@ enum TerrainRenderer {
             layer.clip(to: Path(boundsClip.isNull ? viewportRect : boundsClip))
             drawTerrain(projected, into: &layer, palette: palette)
         }
+        // Map-edge border (KAN-20 Gate 3 / §07 map-frame): a 3pt ink stroke tracing
+        // the authored world edge, ABOVE terrain and BELOW pins, visible wherever
+        // the edge is on screen. Ink token ⇒ inverts in Deepdark; bare parchment
+        // sits outside it. Drawn clipped to the viewport so off-screen edges cost
+        // nothing. (Corner treatment is a plain miter pending Jeff's §07 line.)
+        context.drawLayer { layer in
+            layer.clip(to: Path(viewportRect))
+            layer.stroke(Path(projected.bounds), with: .color(palette.ink),
+                         style: StrokeStyle(lineWidth: 3, lineJoin: .miter))
+        }
         context.drawLayer { layer in
             layer.clip(to: Path(viewportRect))
             drawPins(projected, into: &layer, palette: palette)
@@ -312,7 +322,8 @@ enum TerrainRenderer {
         if melts, line.count >= 2 {
             let a = line[line.count - 2], b = line[line.count - 1]
             let dir = CGVector(dx: b.x - a.x, dy: b.y - a.y).normalized
-            line.append(CGPoint(x: b.x + dir.dx * 12, y: b.y + dir.dy * 12))
+            let runIn = river.meltRunIn
+            line.append(CGPoint(x: b.x + dir.dx * runIn, y: b.y + dir.dy * runIn))
         }
         let pts = sampledCurve(line)
         guard pts.count >= 2 else { return }

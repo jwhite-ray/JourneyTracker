@@ -75,6 +75,12 @@ struct TerrainRiver {
     var sourceWidth: CGFloat = 9
     var mouthWidth: CGFloat = 13
     var mouth: Mouth = .inland
+    /// How far (in the river's own coordinate space) the melting body runs PAST its
+    /// authored mouth into the receiving water. Default 12 matches the P1/P2
+    /// authored look; the P3 camera path overrides it with a SCALE-AWARE screen
+    /// value clamped to the receiver's projected footprint, so a mouth never
+    /// overshoots a tiny far-zoom lake (KAN-20 Gate 3).
+    var meltRunIn: CGFloat = 12
 }
 
 /// A coastline (§07.3.5). `coastline` is the true shore polyline; `seaward` is
