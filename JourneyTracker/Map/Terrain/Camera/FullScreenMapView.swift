@@ -18,6 +18,9 @@ struct FullScreenMapView: View {
     @Environment(\.self) private var environment
 
     let presentation: JourneyMapPresentation
+    /// Wren's §04 pose (resting when the journey is complete). Passed through from
+    /// the journey view so both surfaces show the same marker.
+    var markerResting: Bool = false
     var initialFraming: MapFraming = .chapter
     /// Debug entries turn the perf overlay on; a real P4 surface would leave it off.
     var showsPerfOverlay: Bool = false
@@ -30,9 +33,11 @@ struct FullScreenMapView: View {
     @State private var perf = MapPerfTracker()
 
     init(presentation: JourneyMapPresentation,
+         markerResting: Bool = false,
          initialFraming: MapFraming = .chapter,
          showsPerfOverlay: Bool = false) {
         self.presentation = presentation
+        self.markerResting = markerResting
         self.initialFraming = initialFraming
         self.showsPerfOverlay = showsPerfOverlay
         _framing = State(initialValue: initialFraming)
@@ -83,6 +88,17 @@ struct FullScreenMapView: View {
                     TerrainRenderer.drawPlanned(plan.scene, into: &ctx, viewport: sz, palette: palette)
                 }
                 .allowsHitTesting(false)
+
+                // Wren, projected through the LIVE scroll-view camera so it tracks
+                // pinch/pan. `body` re-evaluates on every published camera change, so
+                // re-projecting the marker each pass is cheap and keeps it pinned to
+                // its point on the trek path as the user moves the map.
+                if controller.isReady, presentation.milesPerMapUnit > 0 {
+                    WrenMarker(resting: markerResting)
+                        .position(controller.camera.project(presentation.markerPosition, in: size))
+                        .allowsHitTesting(false)
+                        .accessibilityIdentifier("map.marker")
+                }
 
                 controls(size: size)
 

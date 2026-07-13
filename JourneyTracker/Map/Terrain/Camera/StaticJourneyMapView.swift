@@ -19,6 +19,9 @@ struct StaticJourneyMapView: View {
     @Environment(\.self) private var environment
 
     let presentation: JourneyMapPresentation
+    /// Wren's §04 pose: parked/resting when the journey is complete, walking
+    /// otherwise (matches the KAN-7 screen's `resting: isCompleted` semantics).
+    var markerResting: Bool = false
     /// Surfaced through to the full-screen map so its perf overlay can be enabled
     /// from a debug entry.
     var fullScreenPerfOverlay: Bool = false
@@ -44,6 +47,18 @@ struct StaticJourneyMapView: View {
                 }
                 .allowsHitTesting(false)
 
+                // Wren rides the trek path by real distance (KAN-7 marker semantics),
+                // drawn as a SwiftUI overlay at the marker's PROJECTED position so it
+                // sits over the terrain Canvas. The map-unit marker position is the
+                // point `markerMiles` along the smoothed trek; the fixed chapter camera
+                // projects it to screen.
+                if presentation.milesPerMapUnit > 0 {
+                    WrenMarker(resting: markerResting)
+                        .position(camera.project(presentation.markerPosition, in: size))
+                        .allowsHitTesting(false)
+                        .accessibilityIdentifier("map.marker")
+                }
+
                 MapIconButton(systemName: "arrow.up.left.and.arrow.down.right") {
                     showFullScreen = true
                 }
@@ -56,6 +71,7 @@ struct StaticJourneyMapView: View {
         }
         .fullScreenCover(isPresented: $showFullScreen) {
             FullScreenMapView(presentation: presentation,
+                              markerResting: markerResting,
                               initialFraming: .chapter,
                               showsPerfOverlay: fullScreenPerfOverlay)
         }
