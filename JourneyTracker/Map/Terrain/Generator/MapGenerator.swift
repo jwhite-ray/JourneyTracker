@@ -30,6 +30,10 @@ enum MapGenerator {
         var densityMultiplier: Double = 1
         var jitterMultiplier: Double = 1
         var featherMultiplier: Double = 1
+        /// Global multiplier (0…1) over the KAN-23 organic pass — the coast/river
+        /// octaves, tributary meander, and trek waver. 1 = full authored roughness,
+        /// 0 = straight traced lines (a clean before/after in the harness).
+        var roughnessMultiplier: Double = 1
     }
 
     enum GeneratorError: Error { case invalidAuthoring([MapViolation]) }
@@ -46,34 +50,97 @@ enum MapGenerator {
     /// and then reruns generation live as knobs move (knobs never change validity).
     static func generateUnchecked(_ authoring: MapAuthoring, tuning: Tuning = .init()) -> TerrainScene {
         let master = tuning.seed ?? authoring.seed
+        let mpu = authoring.milesPerMapUnit
+        let roughG = tuning.roughnessMultiplier
         var scene = TerrainScene()
         scene.bounds = authoring.bounds
 
         var glyphs: [TerrainGlyph] = []
         var pins: [TerrainPin] = []
 
+        // Anchors that hold the organically-displaced coastline back toward the
+        // traced line (KAN-23): authored river sea-mouths (so a mouth still melts on
+        // the DRAWN shore) and shoreside town projections (so a shoreside settlement
+        // stays dry after the bays are carved). Computed from AUTHORING, before the
+        // coast is displaced.
+        let coastAnchors = coastPinAnchors(authoring, mpu: mpu)
+
         // Pass 1 — water. Emit coast/lakes/rivers AND build the wetness mask that
         // pass-2 settlements resample away from, so `TerrainRenderer` never draws a
         // home standing in a lake, the sea, or a river (validation "over the region
-        // set and its GENERATED placement", App Concept doc). Rivers are meandered
-        // from their own substream here, so their generated centerlines are known
-        // before any home is placed.
+        // set and its GENERATED placement", App Concept doc). Everything downstream
+        // validates against what is actually DRAWN — the displaced coast and the
+        // meandered centerlines — never the pre-noise authoring (KAN-19/20 lesson).
         var water = WaterMask()
+
+        // 1 · Displace every coastline UP FRONT. Each coast's displacement is a pure
+        // function of its OWN substream + authoring anchors, so this is
+        // order-independent — and it lets the river meander and the tributaries below
+        // avoid the DRAWN sea, not the traced line.
         for region in authoring.regions {
-            switch region {
-            case .coast(let c):
-                scene.coast = TerrainCoast(coastline: c.coastline, seaward: c.seaward, seaCorners: c.seaCorners)
-                water.seaPolygon = MapGeometry.seaPolygon(coastline: c.coastline, seaCorners: c.seaCorners)
-            case .lake(let l):
-                scene.lakes.append(TerrainBlob(ring: l.ring))
-                water.lakeRings.append(MapGeometry.catmullRomSampledClosed(l.ring))
-            case .river(let r):
-                var rng = MapRNG.substream(master: master, regionID: region.id)
-                let river = makeRiver(r, authoring: authoring, rng: &rng)
-                scene.rivers.append(river)
-                water.riverLines.append((river.centerline, river.mouthWidth / 2))
-            default:
-                break
+            guard case .coast(let c) = region else { continue }
+            var rng = MapRNG.substream(master: master, regionID: region.id)
+            let displaced = MapOrganicDetail.displaceCoastline(
+                c.coastline, seaward: c.seaward,
+                roughness: c.roughness, globalRoughness: roughG,
+                milesPerMapUnit: mpu, anchors: coastAnchors, rng: &rng)
+            scene.coasts.append(TerrainCoast(coastline: displaced, seaward: c.seaward, seaCorners: c.seaCorners))
+            water.seaPolygons.append(MapGeometry.seaPolygon(coastline: displaced, seaCorners: c.seaCorners))
+        }
+        let displacedSeas = water.seaPolygons.filter { $0.count >= 3 }
+
+        // 2 · Lakes (smoothed rings the renderer fills).
+        let lakeRings = authoring.lakes.map { MapGeometry.catmullRomSampledClosed($0.ring) }
+        for l in authoring.lakes { scene.lakes.append(TerrainBlob(ring: l.ring)) }
+        water.lakeRings = lakeRings
+
+        // 3 · Meander every MAIN river first, water-checked against the DRAWN sea/lakes
+        // (its own mouth's approach into its receiver is excluded). Carry each river's
+        // substream forward so its tributaries resume the exact same stream.
+        struct MainRiver { let region: MapRegion.River; var rng: SplitMix64; let river: TerrainRiver }
+        var mains: [MainRiver] = []
+        for region in authoring.regions {
+            guard case .river(let r) = region else { continue }
+            var rng = MapRNG.substream(master: master, regionID: region.id)
+            let mouth = mouthKind(for: r, in: authoring)
+            let receiver = receiverPolygon(for: r, mouth: mouth, seas: displacedSeas, lakeRings: lakeRings)
+            let centerline = MapOrganicDetail.meanderRiver(
+                r.hint, amplitude: r.meanderAmplitude, globalRoughness: roughG,
+                avoidSeas: displacedSeas, avoidLakes: lakeRings, receiver: receiver, rng: &rng)
+            mains.append(MainRiver(region: r, rng: rng,
+                                   river: TerrainRiver(centerline: centerline,
+                                                       sourceWidth: r.sourceWidth,
+                                                       mouthWidth: r.mouthWidth, mouth: mouth)))
+        }
+
+        // 4 · Emit mains + their tributaries. Tributaries avoid the DRAWN sea, lakes,
+        // the trek/roads, and the OTHER mains' MEANDERED (drawn) centerlines.
+        let pathPolylines: [[CGPoint]] = authoring.regions.compactMap { region in
+            if case .trekPath(let t) = region { return MapGeometry.catmullRomSampled(t.points) }
+            if case .road(let rd) = region { return MapGeometry.catmullRomSampled(rd.points) }
+            return nil
+        }
+        let ranges: [MapRegion.Range] = authoring.regions.compactMap {
+            if case .range(let rg) = $0 { return rg }; return nil
+        }
+        for mr in mains {
+            scene.rivers.append(mr.river)
+            water.riverLines.append((mr.river.centerline, mr.river.mouthWidth / 2))
+            var rng = mr.rng
+            let siblingLines = mains.filter { $0.region.id != mr.region.id }.map { $0.river.centerline }
+            let context = MapOrganicDetail.TributaryContext(
+                lakeRings: lakeRings,
+                seaPolygons: displacedSeas,
+                avoidPolylines: pathPolylines + siblingLines,
+                ranges: ranges,
+                milesPerMapUnit: mpu)
+            let tributaries = MapOrganicDetail.tributaries(
+                hasTributaries: mr.region.tributaries, mainCenterline: mr.river.centerline,
+                mainSourceWidth: mr.region.sourceWidth, mainMouthWidth: mr.region.mouthWidth,
+                globalRoughness: roughG, context: context, rng: &rng)
+            for tr in tributaries {
+                scene.rivers.append(tr)
+                water.riverLines.append((tr.centerline, tr.mouthWidth / 2))
             }
         }
 
@@ -106,10 +173,21 @@ enum MapGenerator {
                 glyphs += makeVillage(s, water: water, rng: &rng)
 
             case .road(let r):
-                scene.paths.append(TerrainPath(points: r.points, style: r.major ? .majorRoad : .road))
+                let pts = MapOrganicDetail.waverPath(r.points, pinnedVertices: [],
+                                                     globalRoughness: roughG, milesPerMapUnit: mpu,
+                                                     lakeRings: water.lakeRings, seaPolygons: water.seaPolygons,
+                                                     rng: &rng)
+                scene.paths.append(TerrainPath(points: pts, style: r.major ? .majorRoad : .road))
 
             case .trekPath(let t):
-                scene.paths.append(TerrainPath(points: t.points, style: .trek))
+                // Waypoints sit ON the drawn trek (a validator), so pin the waver to
+                // zero at each waypoint position — the traced spine still wavers
+                // between them so long straight legs don't render ruler-straight.
+                let pts = MapOrganicDetail.waverPath(t.points, pinnedVertices: authoring.waypoints.map(\.position),
+                                                     globalRoughness: roughG, milesPerMapUnit: mpu,
+                                                     lakeRings: water.lakeRings, seaPolygons: water.seaPolygons,
+                                                     rng: &rng)
+                scene.paths.append(TerrainPath(points: pts, style: .trek))
             }
         }
 
@@ -131,14 +209,14 @@ enum MapGenerator {
     /// generated (meandered) centerlines with a bank half-width.
     private struct WaterMask {
         var lakeRings: [[CGPoint]] = []
-        var seaPolygon: [CGPoint] = []
+        var seaPolygons: [[CGPoint]] = []
         var riverLines: [(line: [CGPoint], halfWidth: CGFloat)] = []
 
         /// True if `p` sits in any water fill, allowing `clearance` map units of
         /// dry margin (a home's footprint half-width).
         func isWet(_ p: CGPoint, clearance: CGFloat) -> Bool {
             for ring in lakeRings where MapGeometry.polygonContains(p, ring) { return true }
-            if !seaPolygon.isEmpty, MapGeometry.polygonContains(p, seaPolygon) { return true }
+            for sea in seaPolygons where MapGeometry.polygonContains(p, sea) { return true }
             for r in riverLines where MapGeometry.distanceToPolyline(p, r.line) <= r.halfWidth + clearance { return true }
             return false
         }
@@ -271,73 +349,134 @@ enum MapGenerator {
         let count = s.homeCount ?? Int.random(in: 3...5, using: &rng)
         var homes: [TerrainGlyph] = []
         for _ in 0..<count {
-            // Rejection-resample a dry site. Every attempt draws from THIS region's
+            // Rejection-resample a DRY site. Every attempt draws from THIS region's
             // own substream, so determinism holds: the same seed always consumes the
-            // same draws and lands the home in the same dry spot — and a reroll can
-            // never leave a home standing in water.
-            var candidate: TerrainGlyph?
+            // same draws and lands the home in the same dry spot. Append ONLY on a dry
+            // break — never the last (still-wet) candidate. If all 12 draws land in
+            // water (likelier now that tributaries thread through settlements), fall
+            // back to the site itself if it's dry, else DROP the home rather than
+            // plant it in water.
+            var placed: TerrainGlyph?
             for _ in 0..<12 {
                 let dx = CGFloat.random(in: -16...16, using: &rng)
                 let dy = CGFloat.random(in: -12...12, using: &rng)
                 let w = CGFloat.random(in: 11...16, using: &rng)
                 let h = w * CGFloat.random(in: 1.0...1.2, using: &rng)
                 let base = CGPoint(x: s.site.x + dx, y: s.site.y + dy)
-                candidate = TerrainGlyph(kind: .home, base: base, size: CGSize(width: w, height: h))
-                if !water.isWet(base, clearance: w * 0.5) { break }
+                if !water.isWet(base, clearance: w * 0.5) {
+                    placed = TerrainGlyph(kind: .home, base: base, size: CGSize(width: w, height: h))
+                    break
+                }
             }
-            if let glyph = candidate { homes.append(glyph) }
+            if let placed {
+                homes.append(placed)
+            } else {
+                let w = CGFloat.random(in: 11...16, using: &rng)
+                let h = w * CGFloat.random(in: 1.0...1.2, using: &rng)
+                if !water.isWet(s.site, clearance: w * 0.5) {
+                    homes.append(TerrainGlyph(kind: .home, base: s.site, size: CGSize(width: w, height: h)))
+                }
+            }
         }
         return homes
     }
 
     // MARK: - Rivers (§07.3.3 / §07.5)
 
-    private static func makeRiver(_ r: MapRegion.River,
-                                  authoring: MapAuthoring,
-                                  rng: inout SplitMix64) -> TerrainRiver {
-        let centerline = meander(r.hint, amplitude: r.meanderAmplitude, rng: &rng)
-        return TerrainRiver(centerline: centerline,
-                            sourceWidth: r.sourceWidth,
-                            mouthWidth: r.mouthWidth,
-                            mouth: mouthKind(for: r, in: authoring))
+    /// The specific DRAWN water polygon a river's mouth terminates in — the lake ring
+    /// or sea polygon whose fill the mouth enters — so the meander water-check can
+    /// EXCLUDE that legitimate approach while still catching a mid-course excursion
+    /// into any other water body (KAN-23). `nil` for offMap/inland mouths (no on-map
+    /// receiver).
+    private static func receiverPolygon(for r: MapRegion.River,
+                                        mouth: TerrainRiver.Mouth,
+                                        seas: [[CGPoint]],
+                                        lakeRings: [[CGPoint]]) -> [CGPoint]? {
+        guard let end = r.hint.last else { return nil }
+        switch mouth {
+        case .freshwater:
+            return lakeRings.first { MapGeometry.polygonContains(end, $0) }
+        case .sea:
+            // The mouth may sit just landward of the coast (within tolerance), so pick
+            // the nearest sea polygon rather than requiring containment.
+            return seas.min {
+                MapGeometry.distanceToPolyline(end, $0) < MapGeometry.distanceToPolyline(end, $1)
+            }
+        case .confluence, .inland, .offMap:
+            return nil
+        }
     }
 
-    /// Meanders a source→mouth hint: resample it, then push each interior sample
-    /// perpendicular by an alternating, envelope-tapered offset (§07.5 "rivers
-    /// meander: alternating curves"). Endpoints keep ZERO offset so the source
-    /// stays in its range and the mouth stays in its lake/at the coast.
-    private static func meander(_ hint: [CGPoint], amplitude: CGFloat, rng: inout SplitMix64) -> [CGPoint] {
-        guard hint.count >= 2 else { return hint }
-        let base = MapGeometry.catmullRomSampled(hint, perSegment: 8)
-        let n = base.count
-        guard n >= 3 else { return base }
-        // Roughly one meander lobe per ~70 map units of length.
-        let length = MapGeometry.polylineLength(base)
-        let lobes = max(1.5, Double(length) / 70)
-        let phase = Double.random(in: 0..<(2 * .pi), using: &rng)
-        var out: [CGPoint] = []
-        for i in 0..<n {
-            let t = Double(i) / Double(n - 1)
-            let envelope = sin(t * .pi)                              // 0 at both ends
-            let wobble = 0.75 + 0.5 * Double.random(in: 0...1, using: &rng)
-            let offsetMag = CGFloat(Double(amplitude) * envelope * wobble * sin(t * lobes * .pi + phase))
-            // Local tangent → left normal.
-            let prev = base[max(i - 1, 0)], next = base[min(i + 1, n - 1)]
-            let tangent = CGVector(dx: next.x - prev.x, dy: next.y - prev.y).normalizedVector
-            let normal = tangent.normal
-            out.append(CGPoint(x: base[i].x + normal.dx * offsetMag,
-                               y: base[i].y + normal.dy * offsetMag))
+    /// Map-unit distance from an authored coast within which a settlement counts as
+    /// "shoreside" and pins the displaced coast in front of it (KAN-23). Kept small
+    /// and independent of the now-40-mile settlement water cap: a town 30 mi inland
+    /// is not a reason to freeze the coast.
+    private static let coastalSettlementPinMiles = 4.0
+
+    /// Map-unit distance from a trek/road within which the coast is pinned back to its
+    /// traced line, so organic displacement can NEVER carve into a path corridor and
+    /// leave the (invisible-to-validators) authored path underwater (KAN-23, Rooster
+    /// finding 2). Covers the full wander budget plus a margin.
+    private static let pathCoastPinMiles = MapOrganicDetail.coastMaxWanderMiles + 1.5
+
+    /// Points that pin the displaced coastline back toward the traced line: authored
+    /// river sea-mouths, shoreside settlement shore-projections, AND stretches of coast
+    /// adjacent to the trek/roads (KAN-23). Handles any number of coasts.
+    private static func coastPinAnchors(_ a: MapAuthoring, mpu: Double) -> [CGPoint] {
+        let smoothCoasts = a.coasts.map { MapGeometry.catmullRomSampled($0.coastline) }
+        guard !smoothCoasts.isEmpty else { return [] }
+        var anchors: [CGPoint] = []
+        for r in a.rivers {
+            guard let mouth = r.hint.last else { continue }
+            for shore in smoothCoasts where MapGeometry.distanceToPolyline(mouth, shore) <= MapValidator.coastMouthToleranceUnits {
+                anchors.append(mouth)
+                break
+            }
         }
-        // Pin the exact endpoints (the sampled curve already ends on them, but
-        // guard against any drift so the mouth/source stay put).
-        out[0] = hint.first!
-        out[n - 1] = hint.last!
+        guard mpu > 0 else { return anchors }
+        for region in a.regions {
+            switch region {
+            case .settlement(let s):
+                for shore in smoothCoasts {
+                    let np = MapOrganicDetail.nearestPointOnPolyline(s.site, shore)
+                    if Double(MapGeometry.dist(s.site, np)) * mpu <= coastalSettlementPinMiles {
+                        anchors.append(np)
+                    }
+                }
+            case .trekPath(let t):
+                anchors += pathCoastAnchors(t.points, coasts: smoothCoasts, mpu: mpu)
+            case .road(let rd):
+                anchors += pathCoastAnchors(rd.points, coasts: smoothCoasts, mpu: mpu)
+            default:
+                break
+            }
+        }
+        return anchors
+    }
+
+    /// Shore projections of a path's stretches that run within `pathCoastPinMiles` of
+    /// a coast — pin points that keep the displaced coast out of the path corridor.
+    private static func pathCoastAnchors(_ points: [CGPoint], coasts: [[CGPoint]], mpu: Double) -> [CGPoint] {
+        var out: [CGPoint] = []
+        // Sample the drawn path coarsely (one pin per anchor radius is plenty).
+        let sampled = MapGeometry.densify(MapGeometry.catmullRomSampled(points),
+                                          spacing: MapOrganicDetail.coastAnchorPinRadius)
+        for p in sampled {
+            for shore in coasts {
+                let np = MapOrganicDetail.nearestPointOnPolyline(p, shore)
+                if Double(MapGeometry.dist(p, np)) * mpu <= pathCoastPinMiles {
+                    out.append(np)
+                }
+            }
+        }
         return out
     }
 
-    /// Derives a river's mouth kind from what it TERMINATES in (§07.3.3): inside a
-    /// lake ⇒ freshwater; at the coastline ⇒ sea; otherwise inland (the validator
-    /// rejects inland, so a valid map never reaches that case).
+    /// Derives a river's mouth kind from what it TERMINATES in (§07.3.3, KAN-23):
+    /// inside a lake ⇒ freshwater; at a coastline ⇒ sea; outside the authored bounds
+    /// ⇒ offMap (drains to an off-map sea/basin — the renderer clips); otherwise
+    /// inland (the validator rejects a mid-land mouth, so a valid map never renders
+    /// that case). Tested against ALL coasts.
     private static func mouthKind(for river: MapRegion.River, in authoring: MapAuthoring) -> TerrainRiver.Mouth {
         guard let mouth = river.hint.last else { return .inland }
         // Test against the SMOOTHED shapes the renderer fills / draws, matching the
@@ -347,9 +486,13 @@ enum MapGenerator {
         }) {
             return .freshwater
         }
-        if let coast = authoring.coast,
-           MapGeometry.distanceToPolyline(mouth, MapGeometry.catmullRomSampled(coast.coastline)) <= MapValidator.coastMouthToleranceUnits {
+        if authoring.coasts.contains(where: {
+            MapGeometry.distanceToPolyline(mouth, MapGeometry.catmullRomSampled($0.coastline)) <= MapValidator.coastMouthToleranceUnits
+        }) {
             return .sea
+        }
+        if !authoring.bounds.contains(mouth) {
+            return .offMap
         }
         return .inland
     }

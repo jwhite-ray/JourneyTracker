@@ -148,11 +148,11 @@ enum MapRenderPlanner {
         let shapePad = screen.insetBy(dx: -12, dy: -12)
 
         // --- Water & ground shapes: project rings/lines, cull by bounding box ---
-        if let coast = scene.coast {
+        for coast in scene.coasts {
             // Coast fills the whole sea side — always keep it.
-            out.coast = TerrainCoast(coastline: coast.coastline.map(P),
-                                     seaward: coast.seaward,
-                                     seaCorners: coast.seaCorners.map(P))
+            out.coasts.append(TerrainCoast(coastline: coast.coastline.map(P),
+                                           seaward: coast.seaward,
+                                           seaCorners: coast.seaCorners.map(P)))
             stats.drawnWaterShapes += 1
         }
         for plains in scene.plains {
@@ -186,11 +186,10 @@ enum MapRenderPlanner {
                 stats.drawnWaterShapes += 1
             }
         }
-        // The projected sea polygon (for the home-over-water skip).
-        var projSea: [CGPoint] = []
-        if let coast = scene.coast {
-            projSea = MapGeometry.seaPolygon(coastline: coast.coastline, seaCorners: coast.seaCorners).map(P)
-        }
+        // The projected sea polygons (for the home-over-water skip + sea-mouth melt).
+        let projSeas: [[CGPoint]] = scene.coasts.map {
+            MapGeometry.seaPolygon(coastline: $0.coastline, seaCorners: $0.seaCorners).map(P)
+        }.filter { $0.count >= 3 }
 
         for river in scene.rivers {
             var line = river.centerline.map(P)
@@ -221,11 +220,24 @@ enum MapRenderPlanner {
                     runIn = min(2.5, 0.7 * inradius)
                 }
             case .sea:
-                if !projSea.isEmpty {
-                    truncateAtShore(&line, inside: projSea)
+                // Truncate at whichever sea the mouth actually enters (a map may have
+                // several coasts).
+                if let mouthMap = river.centerline.last,
+                   let sea = projSeas.first(where: { MapGeometry.polygonContains(P(mouthMap), $0) }) {
+                    truncateAtShore(&line, inside: sea)
+                    runIn = min(2.5, mw)
+                } else if let sea = projSeas.first {
+                    truncateAtShore(&line, inside: sea)
                     runIn = min(2.5, mw)
                 }
-            case .inland:
+            case .confluence:
+                // A tributary melting into a main river (KAN-23): no lake/sea shore
+                // to truncate at — the junction already sits on the main centerline.
+                // Overlap a short fixed run so the same-tone body reads continuous.
+                runIn = min(2.5, mw)
+            case .inland, .offMap:
+                // offMap runs full-width to/past the bounds edge; the bounds clip in
+                // `drawPlanned` cuts it there. Nothing to truncate or melt (KAN-23).
                 break
             }
             if boundingBox(line).insetBy(dx: -mw - runIn, dy: -mw - runIn).intersects(shapePad) {
@@ -273,7 +285,7 @@ enum MapRenderPlanner {
         let taperActive = sizeMul < 0.999
         func homeOverWater(footprint: CGRect, base: CGPoint) -> Bool {
             if projLakes.contains(where: { $0.projBox.intersects(footprint) }) { return true }
-            if !projSea.isEmpty, MapGeometry.polygonContains(base, projSea) { return true }
+            if projSeas.contains(where: { MapGeometry.polygonContains(base, $0) }) { return true }
             return false
         }
 

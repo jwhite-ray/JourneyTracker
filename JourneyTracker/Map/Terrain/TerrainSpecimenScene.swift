@@ -47,7 +47,7 @@ enum TerrainSpecimenScene {
 
         // 1 · Ocean / coast down the right edge, with bays (curving inland) and
         // headlands (curving seaward) — never a straight edge (§07.5).
-        scene.coast = TerrainCoast(
+        scene.coasts = [TerrainCoast(
             coastline: [
                 CGPoint(x: 325, y: -12), CGPoint(x: 332, y: 60), CGPoint(x: 300, y: 132),
                 CGPoint(x: 348, y: 202), CGPoint(x: 314, y: 286), CGPoint(x: 356, y: 360),
@@ -56,7 +56,7 @@ enum TerrainSpecimenScene {
             ],
             seaward: CGVector(dx: 1, dy: 0),
             seaCorners: [CGPoint(x: 420, y: 720), CGPoint(x: 420, y: -20)]
-        )
+        )]
 
         // 2 · Ground cover.
         // Plains wash across the lower-central land.

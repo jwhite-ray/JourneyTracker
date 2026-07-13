@@ -11,9 +11,9 @@
 //  a ~30-mile leg, so one full-screen render ≈ chapter zoom and proportions match
 //  the approved P1 specimen — the lake reads clearly bigger than the river width,
 //  forests read as dense masses, not specks. Region sizes still obey the canonical
-//  real-mile bounds; because a 75-mi-minimum range can't fit a 30-mi corridor, the
-//  Ember Spire range runs off BOTH map edges (validated on TOTAL length; the
-//  renderer clips) — scenery is bigger than the journey, exactly as intended.
+//  real-mile bounds; because even a 15-mi-minimum range is authored much larger here
+//  than a 30-mi corridor, the Ember Spire range runs off BOTH map edges (validated on
+//  TOTAL length; the renderer clips) — scenery is bigger than the journey, as intended.
 //
 //  All names are original JourneyTracker proper nouns — no real-world IP.
 //
@@ -45,7 +45,7 @@ enum SampleJourneyMap {
         )))
 
         // Ember Spire's range — a broad mass across the top, densest at the summit.
-        // 1200 map units long ≈ 76.6 mi (75–300 ✓), 124 units wide ≈ 7.9 mi (≤10 ✓).
+        // 1200 map units long ≈ 76.6 mi (15–300 ✓), 124 units wide ≈ 7.9 mi (≤10 ✓).
         // It runs off BOTH side edges (x −430…770); the renderer clips to bounds.
         // An explicit density keeps the on-screen (in-bounds) peak count moderate
         // (§07.4) despite the huge off-map authored area.
@@ -64,7 +64,7 @@ enum SampleJourneyMap {
         regions.append(.forest(.init(id: "forest.westwood", center: CGPoint(x: 92, y: 430), rx: 74, ry: 58)))
         regions.append(.forest(.init(id: "forest.copse", center: CGPoint(x: 255, y: 545), rx: 46, ry: 36)))
 
-        // A lake — asymmetric blob, ≈11.9 sq mi (0.3–30 ✓), clearly wider than any
+        // A lake — asymmetric blob, ≈11.9 sq mi (0.3–60 ✓), clearly wider than any
         // river. River 1 melts into it.
         regions.append(.lake(.init(
             id: "lake.stillwater",

@@ -70,7 +70,16 @@ struct TerrainRiver {
     /// receiving body — the renderer fades the dark bank out and runs the body
     /// (same water token as the receiver) a short way in, so there's no seam. A
     /// `sea` mouth additionally transitions the body toward the shallow band tone.
-    enum Mouth { case inland, freshwater, sea }
+    /// A `confluence` mouth is a tributary melting into a MAIN RIVER (KAN-23): it
+    /// melts exactly like `freshwater` (bank fades, body runs on at the same water
+    /// tone), but there is no lake/sea shore to truncate at — the render plan just
+    /// overlaps a short fixed run into the main river so the join is fill-continuous.
+    /// An `offMap` mouth exits the authored bounds (KAN-23 "drawing trumps the
+    /// rules": a river may drain to an off-map sea/basin). It does NOT melt — there's
+    /// no on-screen receiving water; the river runs full-width to/past the bounds
+    /// edge and the renderer's bounds clip cuts it there, so it reads as flowing off
+    /// the map. The render plan performs no shore truncation for it.
+    enum Mouth { case inland, freshwater, sea, confluence, offMap }
     var centerline: [CGPoint]
     var sourceWidth: CGFloat = 9
     var mouthWidth: CGFloat = 13
@@ -150,7 +159,10 @@ struct TerrainScene {
     /// doc). The renderer aspect-fits this into whatever `Canvas` size it gets —
     /// a stand-in for the P3 camera transform, which is not built here.
     var bounds: CGRect = CGRect(x: 0, y: 0, width: 390, height: 700)
-    var coast: TerrainCoast? = nil
+    /// Coasts (§07.3.5). An ARRAY so a map can author more than one coast (a wrapped
+    /// L-shaped sea authored as two arms, an inland sea plus an ocean, …) — KAN-23.
+    /// The §07.6 draw order treats them as one stage (drawn first, back to front).
+    var coasts: [TerrainCoast] = []
     var plains: [TerrainPlains] = []
     var marshes: [TerrainMarsh] = []
     var lakes: [TerrainBlob] = []

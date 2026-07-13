@@ -71,8 +71,8 @@ enum TerrainRenderer {
     static func drawTerrain(_ scene: TerrainScene,
                             into context: inout GraphicsContext,
                             palette: TerrainPalette) {
-        // 1 · Ocean / coast
-        if let coast = scene.coast { drawCoast(coast, into: &context, palette: palette) }
+        // 1 · Ocean / coast (may be several — a wrapped/L-shaped sea, an inland sea)
+        for coast in scene.coasts { drawCoast(coast, into: &context, palette: palette) }
 
         // 2 · Ground cover — plains wash + tufts, then dunes, then marsh
         for plains in scene.plains { drawPlains(plains, into: &context, palette: palette) }
@@ -317,7 +317,10 @@ enum TerrainRenderer {
         // overlaps it and fill continuity — not an edge — makes the join. Rivers
         // draw after lakes/ocean (§07.6), so this overlap sits on top and, being
         // the same tone, reads seamless.
-        let melts = river.mouth != .inland
+        // Freshwater / sea / confluence mouths MELT into receiving water; inland and
+        // offMap mouths do not (offMap runs full-width to the bounds edge and the
+        // clip cuts it — §07.3.3, KAN-23).
+        let melts = river.mouth == .freshwater || river.mouth == .sea || river.mouth == .confluence
         var line = river.centerline
         if melts, line.count >= 2 {
             let a = line[line.count - 2], b = line[line.count - 1]
@@ -399,12 +402,23 @@ enum TerrainRenderer {
                                   into ctx: inout GraphicsContext,
                                   palette: TerrainPalette) {
         guard coast.coastline.count >= 2 else { return }
-        // Three flat depth bands. We fill the whole sea lightest first, then two
-        // copies offset seaward and progressively darker, so the near-shore strips
-        // reveal the lighter bands (shallow → deep, no blend).
-        seaBand(coast, offset: 0, color: palette.water.highlight, into: &ctx)
-        seaBand(coast, offset: 10, color: palette.water.base, into: &ctx)
-        seaBand(coast, offset: 22, color: palette.water.shadow, into: &ctx)
+        // The sampled shore + its fill polygon (shore + seaCorners), computed once.
+        // Depth bands offset each shore SAMPLE along its own per-vertex seaward
+        // normal — so on a wrapped/L-shaped sea the bands follow the coast around
+        // the corner instead of shearing into self-intersecting shards (KAN-23).
+        let sampled = sampledCurve(coast.coastline)
+        var seaPoly = sampled
+        seaPoly.append(contentsOf: coast.seaCorners)
+
+        // Three flat depth bands: fill the whole sea lightest first, then two copies
+        // offset seaward and progressively darker, so near-shore strips reveal the
+        // lighter bands (shallow → deep, no blend).
+        seaBand(sampled: sampled, seaPoly: seaPoly, seaCorners: coast.seaCorners,
+                seaward: coast.seaward, offset: 0, color: palette.water.highlight, into: &ctx)
+        seaBand(sampled: sampled, seaPoly: seaPoly, seaCorners: coast.seaCorners,
+                seaward: coast.seaward, offset: 10, color: palette.water.base, into: &ctx)
+        seaBand(sampled: sampled, seaPoly: seaPoly, seaCorners: coast.seaCorners,
+                seaward: coast.seaward, offset: 22, color: palette.water.shadow, into: &ctx)
 
         // Pale surf stroke on the true coastline (matches the lake shoreline rim).
         let shore = smoothedPath(coast.coastline, closed: false)
@@ -412,20 +426,21 @@ enum TerrainRenderer {
                    style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
     }
 
-    private static func seaBand(_ coast: TerrainCoast,
+    private static func seaBand(sampled: [CGPoint],
+                                seaPoly: [CGPoint],
+                                seaCorners: [CGPoint],
+                                seaward: CGVector,
                                 offset: CGFloat,
                                 color: Color,
                                 into ctx: inout GraphicsContext) {
-        let dir = coast.seaward.normalized
-        let shifted = coast.coastline.map {
-            $0.offset(CGVector(dx: dir.dx * offset, dy: dir.dy * offset))
-        }
-        let sampled = sampledCurve(shifted)
+        let shifted = offset == 0
+            ? sampled
+            : MapGeometry.offsetSeaward(sampled, seaPoly: seaPoly, seawardHint: seaward, offset: offset)
         var path = Path()
-        guard let first = sampled.first else { return }
+        guard let first = shifted.first else { return }
         path.move(to: first)
-        for p in sampled.dropFirst() { path.addLine(to: p) }
-        for corner in coast.seaCorners { path.addLine(to: corner) }
+        for p in shifted.dropFirst() { path.addLine(to: p) }
+        for corner in seaCorners { path.addLine(to: corner) }
         path.closeSubpath()
         ctx.fill(path, with: .color(color))
     }

@@ -33,8 +33,12 @@ struct MapViolation: Identifiable, Equatable {
 
 enum MapValidator {
 
-    /// How near a settlement must sit to water to count as "by water" (§07.5).
-    static let settlementWaterMiles = 4.0
+    /// Soft sanity cap on how far inland a settlement may sit from water (KAN-23
+    /// "drawing trumps the rules": real worlds have road/market towns miles from any
+    /// shore — the pilot's farthest is ~33 mi). This is a physical-absurdity guard,
+    /// not the §07.5 "villages hug the shore" aesthetic (which is now Jeff's design
+    /// preference, not a validator).
+    static let settlementWaterMiles = 40.0
     /// Map-unit tolerance for "waypoint lies on the trek path."
     static let onPathToleranceUnits: CGFloat = 1.5
     /// Map-unit tolerance for a river mouth counting as "at the coastline."
@@ -88,16 +92,17 @@ enum MapValidator {
         a.lakes.map { MapGeometry.catmullRomSampledClosed($0.ring) }
     }
 
-    /// The closed sea polygon, or `nil` if there's no coast.
-    static func seaPolygon(_ a: MapAuthoring) -> [CGPoint]? {
-        guard let coast = a.coast else { return nil }
-        let poly = MapGeometry.seaPolygon(coastline: coast.coastline, seaCorners: coast.seaCorners)
-        return poly.isEmpty ? nil : poly
+    /// The closed sea polygon per coast (KAN-23: a map may have several coasts).
+    /// Empty polygons are dropped.
+    static func seaPolygons(_ a: MapAuthoring) -> [[CGPoint]] {
+        a.coasts.map { MapGeometry.seaPolygon(coastline: $0.coastline, seaCorners: $0.seaCorners) }
+            .filter { !$0.isEmpty }
     }
 
-    /// The smoothed shore polyline (open), for river-mouth "at the coast" distance.
-    static func smoothedCoastline(_ a: MapAuthoring) -> [CGPoint]? {
-        a.coast.map { MapGeometry.catmullRomSampled($0.coastline) }
+    /// The smoothed shore polyline (open) per coast, for river-mouth "at the coast"
+    /// distance and settlement "by water" distance.
+    static func smoothedCoastlines(_ a: MapAuthoring) -> [[CGPoint]] {
+        a.coasts.map { MapGeometry.catmullRomSampled($0.coastline) }
     }
 
     // MARK: - Scale anchor: trek arc length ↔ journey mileage
@@ -157,8 +162,11 @@ enum MapValidator {
             case .range(let r):
                 let lengthMi = Double(2 * r.halfLength) * mpu
                 let widthMi = Double(2 * r.halfWidth) * mpu
-                if lengthMi < 75 || lengthMi > 300 {
-                    out.append(MapViolation(subject: r.id, rule: "range length 75–300 mi",
+                // KAN-23: 15 mi min covers hill-chains as well as great massifs
+                // (one `range` kind spans both; the renderer draws short/low ones as
+                // hills). Loosened from 75 to fit real hand-drawn hill country.
+                if lengthMi < 15 || lengthMi > 300 {
+                    out.append(MapViolation(subject: r.id, rule: "range/hill-chain length 15–300 mi",
                                             detail: "authored length is \(fmt(lengthMi)) mi"))
                 }
                 if widthMi > 10 {
@@ -173,8 +181,8 @@ enum MapValidator {
                 }
             case .lake(let l):
                 let areaMi = Double(MapGeometry.polygonArea(l.ring)) * sqMpu
-                if areaMi < 0.3 || areaMi > 30 {
-                    out.append(MapViolation(subject: l.id, rule: "lake area 0.3–30 sq mi",
+                if areaMi < 0.3 || areaMi > 60 {  // KAN-23: cap raised 30 → 60 sq mi
+                    out.append(MapViolation(subject: l.id, rule: "lake area 0.3–60 sq mi",
                                             detail: "authored area is \(fmt(areaMi)) sq mi"))
                 }
             case .river(let r):
@@ -190,27 +198,34 @@ enum MapValidator {
         return out
     }
 
-    // MARK: - Rivers: start off-map or in a range; end in a lake or at the coast
+    // MARK: - Rivers: source not IN water; mouth in a lake, at the coast, or off-map
 
     private static func validateRivers(_ a: MapAuthoring) -> [MapViolation] {
         var out: [MapViolation] = []
-        let ranges: [MapRegion.Range] = a.regions.compactMap { if case .range(let r) = $0 { return r }; return nil }
         let lakeRings = smoothedLakeRings(a)
-        let shore = smoothedCoastline(a)
+        let seas = seaPolygons(a)
+        let shores = smoothedCoastlines(a)
 
         for river in a.rivers {
             guard let source = river.hint.first, let mouth = river.hint.last else { continue }
-            let startsOffMap = !a.bounds.contains(source)
-            let startsInRange = ranges.contains { pointInRange(source, $0) }
-            if !startsOffMap && !startsInRange {
-                out.append(MapViolation(subject: river.id, rule: "river source off-map or in a range",
-                                        detail: "source \(fmt(source)) is on land and not inside any range"))
+            // KAN-23 "drawing trumps the rules": a source may rise anywhere on land
+            // (upland spring, range, or off-map). The only kept rule is that it must
+            // NOT rise inside water — a river can't spring out of a lake or the sea.
+            let sourceInLake = lakeRings.contains { MapGeometry.polygonContains(source, $0) }
+            let sourceInSea = seas.contains { MapGeometry.polygonContains(source, $0) }
+            if sourceInLake || sourceInSea {
+                out.append(MapViolation(subject: river.id, rule: "river source not in water",
+                                        detail: "source \(fmt(source)) rises inside a lake or the sea"))
             }
+            // A mouth terminates in a lake, at the coast, OR by exiting the authored
+            // bounds (draining to an off-map sea/basin; the renderer clips). Only a
+            // mouth that stops mid-land inside the map is an error.
             let endsInLake = lakeRings.contains { MapGeometry.polygonContains(mouth, $0) }
-            let endsAtCoast = shore.map { MapGeometry.distanceToPolyline(mouth, $0) <= coastMouthToleranceUnits } ?? false
-            if !endsInLake && !endsAtCoast {
-                out.append(MapViolation(subject: river.id, rule: "river mouth in a lake or at the coast",
-                                        detail: "mouth \(fmt(mouth)) terminates mid-land"))
+            let endsAtCoast = shores.contains { MapGeometry.distanceToPolyline(mouth, $0) <= coastMouthToleranceUnits }
+            let endsOffMap = !a.bounds.contains(mouth)
+            if !endsInLake && !endsAtCoast && !endsOffMap {
+                out.append(MapViolation(subject: river.id, rule: "river mouth in a lake, at the coast, or off-map",
+                                        detail: "mouth \(fmt(mouth)) terminates mid-land inside the map"))
             }
         }
         return out
@@ -221,7 +236,7 @@ enum MapValidator {
     private static func validatePathsAvoidWater(_ a: MapAuthoring) -> [MapViolation] {
         var out: [MapViolation] = []
         let lakeRings = smoothedLakeRings(a)
-        let sea = seaPolygon(a)
+        let seas = seaPolygons(a)
         let lakeIDs = a.lakes.map(\.id)
 
         func check(_ id: String, _ label: String, _ points: [CGPoint]) {
@@ -234,7 +249,7 @@ enum MapValidator {
                                             detail: "crosses lake \(lakeIDs[idx]) near \(fmt(p))"))
                     return
                 }
-                if let sea, MapGeometry.polygonContains(p, sea) {
+                if seas.contains(where: { MapGeometry.polygonContains(p, $0) }) {
                     out.append(MapViolation(subject: id, rule: "\(label) stays on land",
                                             detail: "crosses the ocean near \(fmt(p))"))
                     return
@@ -257,7 +272,7 @@ enum MapValidator {
         guard mpu > 0 else { return [] }
         let lakeRings = smoothedLakeRings(a)
         let rivers = a.rivers
-        let shore = smoothedCoastline(a)
+        let shores = smoothedCoastlines(a)
 
         for region in a.regions {
             guard case .settlement(let s) = region else { continue }
@@ -270,11 +285,13 @@ enum MapValidator {
             for river in rivers {
                 nearestUnits = min(nearestUnits, MapGeometry.distanceToPolyline(s.site, MapGeometry.catmullRomSampled(river.hint)))
             }
-            if let shore { nearestUnits = min(nearestUnits, MapGeometry.distanceToPolyline(s.site, shore)) }
+            for shore in shores {
+                nearestUnits = min(nearestUnits, MapGeometry.distanceToPolyline(s.site, shore))
+            }
             let nearestMiles = Double(nearestUnits) * mpu
             if nearestMiles > settlementWaterMiles {
-                out.append(MapViolation(subject: s.name ?? s.id, rule: "settlement by water",
-                                        detail: "nearest water is \(fmt(nearestMiles)) mi away (limit \(fmt(settlementWaterMiles)) mi)"))
+                out.append(MapViolation(subject: s.name ?? s.id, rule: "settlement within \(Int(settlementWaterMiles)) mi of water",
+                                        detail: "nearest water is \(fmt(nearestMiles)) mi away (cap \(fmt(settlementWaterMiles)) mi)"))
             }
         }
         return out
@@ -297,17 +314,6 @@ enum MapValidator {
     }
 
     // MARK: - Helpers
-
-    /// True if `p` is inside a range's oriented ellipse (used for river sources).
-    private static func pointInRange(_ p: CGPoint, _ r: MapRegion.Range) -> Bool {
-        let dx = p.x - r.center.x, dy = p.y - r.center.y
-        let c = cos(-r.axisAngle), s = sin(-r.axisAngle)
-        let lx = dx * c - dy * s   // along length axis
-        let ly = dx * s + dy * c   // along width axis
-        guard r.halfLength > 0, r.halfWidth > 0 else { return false }
-        let u = lx / r.halfLength, v = ly / r.halfWidth
-        return u * u + v * v <= 1
-    }
 
     private static func fmt(_ v: Double) -> String { String(format: "%.1f", v) }
     private static func fmt(_ p: CGPoint) -> String { String(format: "(%.0f, %.0f)", p.x, p.y) }
