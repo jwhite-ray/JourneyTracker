@@ -193,27 +193,42 @@ enum MapRenderPlanner {
         }
 
         for river in scene.rivers {
-            let line = river.centerline.map(P)
+            var line = river.centerline.map(P)
             // Widths taper with altitude so a river never becomes a highway band.
             var mw = river.mouthWidth * sizeMul
             let sw = river.sourceWidth * sizeMul
-            // The melt run-in is SCALE-AWARE (∝ the tapered width) instead of a
-            // fixed 12 map units — the map-space overshoot that floated/overshot a
-            // tiny far-zoom lake. For a freshwater mouth we additionally CLAMP the
-            // mouth stroke and run-in to the receiving lake's PROJECTED inradius, so
-            // the river always terminates INSIDE its lake, never poking past — even
-            // when the lake projects smaller than the untapered stroke.
-            var runIn = mw
-            if river.mouth == .freshwater, let mouthMap = river.centerline.last,
-               let lake = projLakes.first(where: { MapGeometry.polygonContains(mouthMap, $0.mapSmoothed) }) {
-                let projMouth = P(mouthMap)
-                let inradius = lake.projRing.reduce(CGFloat.greatestFiniteMagnitude) {
-                    min($0, MapGeometry.dist(projMouth, $1))
+            // MELT AT THE SHORE. The authored/generated mouth point sits INSIDE the
+            // receiving water (the validator requires containment), so the drawn
+            // centerline ran deep into the lake — glaring at high zoom. Instead we
+            // TRUNCATE the projected centerline at the receiver's SHORE (the smoothed
+            // ring the renderer actually fills), then extend only a tiny fixed
+            // overlap past it so no parchment gap ever shows. The bank-width taper in
+            // `drawRiver` still thins the dark banks approaching the water.
+            var runIn: CGFloat = 0
+            switch river.mouth {
+            case .freshwater:
+                if let mouthMap = river.centerline.last,
+                   let lake = projLakes.first(where: { MapGeometry.polygonContains(mouthMap, $0.mapSmoothed) }) {
+                    let shore = MapGeometry.catmullRomSampledClosed(lake.projRing)
+                    let projMouth = P(mouthMap)
+                    let inradius = shore.reduce(CGFloat.greatestFiniteMagnitude) {
+                        min($0, MapGeometry.dist(projMouth, $1))
+                    }
+                    // Safety clamp for tiny projected lakes; overlap never exceeds the
+                    // lake so the cap can't cross to the far shore.
+                    mw = min(mw, max(1.0, 1.2 * inradius))
+                    truncateAtShore(&line, inside: shore)
+                    runIn = min(2.5, 0.7 * inradius)
                 }
-                mw = min(mw, max(1.0, 1.2 * inradius))
-                runIn = min(mw, 0.5 * inradius)
+            case .sea:
+                if !projSea.isEmpty {
+                    truncateAtShore(&line, inside: projSea)
+                    runIn = min(2.5, mw)
+                }
+            case .inland:
+                break
             }
-            if boundingBox(line).insetBy(dx: -mw, dy: -mw).intersects(shapePad) {
+            if boundingBox(line).insetBy(dx: -mw - runIn, dy: -mw - runIn).intersects(shapePad) {
                 out.rivers.append(TerrainRiver(centerline: line, sourceWidth: min(sw, mw),
                                                mouthWidth: mw, mouth: river.mouth, meltRunIn: runIn))
                 stats.drawnWaterShapes += 1
@@ -309,6 +324,48 @@ enum MapRenderPlanner {
     }
 
     // MARK: - Helpers
+
+    /// Truncates a river centerline at the receiving water's shore: cuts off the
+    /// tail that runs inside `inside` (the smoothed projected ring / sea polygon)
+    /// and ends the line exactly at the shore crossing nearest the mouth. If the
+    /// mouth isn't inside the receiver (e.g. a sea mouth authored just landward of
+    /// the coastline) the line is left as-is. Pure geometry — deterministic.
+    private static func truncateAtShore(_ line: inout [CGPoint], inside ring: [CGPoint]) {
+        guard line.count >= 2, ring.count >= 3, let mouth = line.last,
+              MapGeometry.polygonContains(mouth, ring) else { return }
+        // Walk back from the mouth to the last point still OUTSIDE the water.
+        var idx = line.count - 1
+        while idx >= 0, MapGeometry.polygonContains(line[idx], ring) { idx -= 1 }
+        guard idx >= 0, idx < line.count - 1 else { return }
+        let cross = segmentPolylineEntry(line[idx], line[idx + 1], ring) ?? line[idx + 1]
+        line = Array(line[0...idx]) + [cross]
+    }
+
+    /// The first point (smallest t along a→b) where segment a→b crosses the closed
+    /// polygon `ring`, or nil if it doesn't.
+    private static func segmentPolylineEntry(_ a: CGPoint, _ b: CGPoint, _ ring: [CGPoint]) -> CGPoint? {
+        var bestT = CGFloat.greatestFiniteMagnitude
+        for i in 0..<ring.count {
+            let c = ring[i], d = ring[(i + 1) % ring.count]
+            if let t = segmentIntersectionT(a, b, c, d), t < bestT { bestT = t }
+        }
+        guard bestT <= 1 else { return nil }
+        return CGPoint(x: a.x + (b.x - a.x) * bestT, y: a.y + (b.y - a.y) * bestT)
+    }
+
+    /// Parametric t along a→b at which it crosses segment c→d, or nil.
+    private static func segmentIntersectionT(_ a: CGPoint, _ b: CGPoint,
+                                             _ c: CGPoint, _ d: CGPoint) -> CGFloat? {
+        let r = CGVector(dx: b.x - a.x, dy: b.y - a.y)
+        let s = CGVector(dx: d.x - c.x, dy: d.y - c.y)
+        let denom = r.dx * s.dy - r.dy * s.dx
+        guard abs(denom) > 1e-9 else { return nil }
+        let qp = CGVector(dx: c.x - a.x, dy: c.y - a.y)
+        let t = (qp.dx * s.dy - qp.dy * s.dx) / denom
+        let u = (qp.dx * r.dy - qp.dy * r.dx) / denom
+        guard t >= 0, t <= 1, u >= 0, u <= 1 else { return nil }
+        return t
+    }
 
     private static func boundingBox(_ pts: [CGPoint]) -> CGRect {
         guard let first = pts.first else { return .null }
