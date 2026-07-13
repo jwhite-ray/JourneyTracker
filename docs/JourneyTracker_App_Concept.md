@@ -91,6 +91,23 @@ A mid-length journey with deliberately uneven waypoint spacing (3-mile and 14-mi
 | 2 | Palefire Hollow | 17 |
 | 3 | Lanternrest | 20 |
 
+**Journey 5 — "Road to The Windrise Peaks"** (KAN-23) · `totalDistance` = 302.4 mi (486,665.6 m) · fantasy
+
+The first journey authored through the KAN-23 hand-drawn-map pipeline: Justin drew the world, the coordinator digitized it (source-image pixels as map units, ~6.85 px/mi), and waypoints were placed by his landmark descriptions. Its faceted map authoring ships in `WindrisePeaksMap` awaiting the P4 journey-view wiring; today the KAN-7 pin-and-route screen renders it via normalized positions. Original names, no real-world IP.
+
+| Order | Waypoint | Cumulative miles |
+|---|---|---|
+| 0 | Wavecrest | 0 |
+| 1 | Millhollow | 14.2 |
+| 2 | Sable Ford | 20.9 |
+| 3 | Hallowmere | 72.9 |
+| 4 | Oxbow Crossing | 122.6 |
+| 5 | Thistlewood | 153.9 |
+| 6 | Farrow's Rest | 172.1 |
+| 7 | Stonewash Ford | 218.8 |
+| 8 | Rivergate | 227.7 |
+| 9 | The Windrise Peaks | 302.4 |
+
 **Waypoint map positions (KAN-7).** `positionX`/`positionY` are image-relative normalized coordinates (0…1, origin top-left). These were all `0` in the shipped seed; KAN-7 seeds real placeholder values so the marker interpolation and pin layout can be verified. Exact values are placeholder art (Jeff finalizes against real backgrounds later); the requirement is only that they are distinct, non-colliding, and roughly track `distanceFromStart` so segment interpolation looks natural.
 
 *The Road to Ember Spire:*
@@ -125,6 +142,21 @@ A mid-length journey with deliberately uneven waypoint spacing (3-mile and 14-mi
 | 1 | Foglow Bridge | 0.24 | 0.76 |
 | 2 | Palefire Hollow | 0.74 | 0.26 |
 | 3 | Lanternrest | 0.86 | 0.14 |
+
+*Road to The Windrise Peaks:* Unlike the earlier journeys' eyeballed art placement, these derive directly from the hand-drawn map's pixel space — `positionX = x / 1190`, `positionY = y / 896` against the 1190×896 source bounds — and are what `SeedData` ships.
+
+| Order | Waypoint | positionX | positionY |
+|---|---|---|---|
+| 0 | Wavecrest | 0.0740 | 0.3371 |
+| 1 | Millhollow | 0.1412 | 0.3973 |
+| 2 | Sable Ford | 0.1647 | 0.4375 |
+| 3 | Hallowmere | 0.4437 | 0.5446 |
+| 4 | Oxbow Crossing | 0.4681 | 0.8359 |
+| 5 | Thistlewood | 0.6370 | 0.7567 |
+| 6 | Farrow's Rest | 0.7244 | 0.8292 |
+| 7 | Stonewash Ford | 0.8748 | 0.6217 |
+| 8 | Rivergate | 0.9160 | 0.5804 |
+| 9 | The Windrise Peaks | 0.9118 | 0.0469 |
 
 *Around the World* (real-world, no waypoints) is the "journey with no waypoints" case the map must degrade gracefully against.
 
