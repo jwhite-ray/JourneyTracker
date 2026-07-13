@@ -27,13 +27,15 @@ struct MapTuningHarnessView: View {
     @State private var densityMultiplier: Double = 1
     @State private var jitterMultiplier: Double = 1
     @State private var featherMultiplier: Double = 1
+    @State private var roughnessMultiplier: Double = 1
     @State private var showControls = true
 
     private var tuning: MapGenerator.Tuning {
         MapGenerator.Tuning(seed: seed,
                             densityMultiplier: densityMultiplier,
                             jitterMultiplier: jitterMultiplier,
-                            featherMultiplier: featherMultiplier)
+                            featherMultiplier: featherMultiplier,
+                            roughnessMultiplier: roughnessMultiplier)
     }
 
     private var violations: [MapViolation] { MapValidator.validate(authoring) }
@@ -148,13 +150,17 @@ struct MapTuningHarnessView: View {
             knob("Density", value: $densityMultiplier)
             knob("Jitter", value: $jitterMultiplier)
             knob("Feather", value: $featherMultiplier)
+            // The KAN-23 organic pass: 0 = straight traced lines, 1 = fully wiggly
+            // coast/rivers/trek. Ranges 0…1 (a multiplier, not a ±2 spread).
+            knob("Roughness", value: $roughnessMultiplier, range: 0...1)
             Button("Reset knobs") {
                 densityMultiplier = 1; jitterMultiplier = 1; featherMultiplier = 1
+                roughnessMultiplier = 1
             }
         }
     }
 
-    private func knob(_ label: String, value: Binding<Double>) -> some View {
+    private func knob(_ label: String, value: Binding<Double>, range: ClosedRange<Double> = 0...2) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
                 Text(label)
@@ -162,7 +168,7 @@ struct MapTuningHarnessView: View {
                 Text(String(format: "×%.2f", value.wrappedValue))
                     .foregroundStyle(.secondary).monospacedDigit()
             }
-            Slider(value: value, in: 0...2)
+            Slider(value: value, in: range)
         }
     }
 

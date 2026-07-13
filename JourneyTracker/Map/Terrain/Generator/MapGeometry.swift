@@ -147,6 +147,40 @@ enum MapGeometry {
         return ring
     }
 
+    /// Offsets each vertex of an (already sampled) coastline SEAWARD by `offset`,
+    /// choosing the seaward side PER VERTEX so ocean depth bands follow the coast
+    /// around corners instead of shearing into self-intersecting shards on a wrapped
+    /// (L-shaped) sea (KAN-23 wrapped-coast fix). The seaward side is the one a small
+    /// step off the vertex lands INSIDE `seaPoly` (the coast's fill polygon: sampled
+    /// coastline + seaCorners); where that test is degenerate it falls back to the
+    /// authored `seawardHint`. Pure — usable by the renderer and by tests.
+    static func offsetSeaward(_ samples: [CGPoint], seaPoly: [CGPoint],
+                              seawardHint: CGVector, offset: CGFloat) -> [CGPoint] {
+        guard offset != 0, samples.count >= 2 else { return samples }
+        let n = samples.count
+        let hint = seawardHint.normalizedVector
+        var out: [CGPoint] = []
+        out.reserveCapacity(n)
+        for i in 0..<n {
+            let prev = samples[max(i - 1, 0)]
+            let next = samples[min(i + 1, n - 1)]
+            var nrm = CGVector(dx: next.x - prev.x, dy: next.y - prev.y).normalizedVector.normal
+            if nrm.length == 0 { nrm = hint }
+            let seg = max(dist(prev, next), 0.001)
+            let eps = min(0.4, 0.2 * seg)
+            let probe = CGPoint(x: samples[i].x + nrm.dx * eps, y: samples[i].y + nrm.dy * eps)
+            var seaward = nrm
+            if seaPoly.count >= 3 {
+                if !polygonContains(probe, seaPoly) { seaward = CGVector(dx: -nrm.dx, dy: -nrm.dy) }
+            } else if (nrm.dx * hint.dx + nrm.dy * hint.dy) < 0 {
+                seaward = CGVector(dx: -nrm.dx, dy: -nrm.dy)
+            }
+            out.append(CGPoint(x: samples[i].x + seaward.dx * offset,
+                               y: samples[i].y + seaward.dy * offset))
+        }
+        return out
+    }
+
     /// Straight-segment arc length of a polyline in map units.
     static func polylineLength(_ pts: [CGPoint]) -> CGFloat {
         guard pts.count > 1 else { return 0 }

@@ -54,7 +54,7 @@ enum EmberSpireScaleFixture {
         )))
 
         // 3 · Oblique mountain massifs at varied positions and angles. 190 mi long,
-        // 8 mi wide (inside 75–300 / ≤10 by construction). Several run off-map.
+        // 8 mi wide (inside 15–300 / ≤10 by construction). Several run off-map.
         struct RangeRef { let center: CGPoint }
         var ranges: [RangeRef] = []
         for k in 0..<10 {
@@ -83,7 +83,7 @@ enum EmberSpireScaleFixture {
         }
 
         // 4 · Lakes, rejection-placed well clear of the trek (so the trek never
-        // crosses water), sized ~15–20 sq mi (upper half of 0.3–30).
+        // crosses water), sized ~15–20 sq mi (mid-range of 0.3–60).
         let lakeRadius = u(2.6)
         for k in 0..<8 {
             var center: CGPoint?

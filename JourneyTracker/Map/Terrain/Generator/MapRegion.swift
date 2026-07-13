@@ -101,8 +101,9 @@ enum MapRegion: Codable, Identifiable {
     // MARK: Shapes
 
     /// A mountain range: an oriented band (§07.5 "ranges run off-map"). `halfLength`
-    /// runs along `axisAngle`; `halfWidth` is perpendicular. Validated as a range
-    /// 75–300 mi long, ≤10 mi wide, on TOTAL authored size (may run off `bounds`).
+    /// runs along `axisAngle`; `halfWidth` is perpendicular. Validated as a
+    /// range/hill-chain 15–300 mi long (KAN-23 loosened the 75-mi minimum for hill
+    /// country), ≤10 mi wide, on TOTAL authored size (may run off `bounds`).
     struct Range: Codable {
         var id: String
         var center: CGPoint
@@ -125,18 +126,24 @@ enum MapRegion: Codable, Identifiable {
     }
 
     /// A river: a source→mouth polyline HINT the generator meanders (§07.5). The
-    /// mouth kind (inland/freshwater/sea) is DERIVED from what it terminates in.
-    /// Validated ≥2 mi long; must start off-map or in a range and end in a lake or
-    /// at the coast.
+    /// mouth kind (inland/freshwater/sea/offMap) is DERIVED from what it terminates
+    /// in. Validated ≥2 mi long; source may rise anywhere on land (just NOT in a lake
+    /// or the sea — KAN-23); mouth ends in a lake, at the coast, or off the authored
+    /// bounds (an off-map sea/basin the renderer clips).
     struct River: Codable {
         var id: String
         var hint: [CGPoint]
         var meanderAmplitude: CGFloat = 8
         var sourceWidth: CGFloat = 5
         var mouthWidth: CGFloat = 12
+        /// Whether the organic pass grows small side-streams off this river (KAN-23,
+        /// §07.3.3). Default on; the count scales with the river's drawn length.
+        /// Tributaries are texture — they never cross lakes/other rivers/the trek.
+        var tributaries: Bool = true
     }
 
-    /// A lake: an asymmetric water blob ring (§07.3.4). Validated 0.3–30 sq mi.
+    /// A lake: an asymmetric water blob ring (§07.3.4). Validated 0.3–60 sq mi (KAN-23
+    /// raised the cap from 30).
     struct Lake: Codable {
         var id: String
         var ring: [CGPoint]
@@ -149,6 +156,10 @@ enum MapRegion: Codable, Identifiable {
         var coastline: [CGPoint]
         var seaward: CGVector
         var seaCorners: [CGPoint]
+        /// Organic-displacement strength for this coast (KAN-23, §07.3.5): 0 leaves
+        /// the traced line as-drawn, 1 is fully wiggly. Multiplied by the harness's
+        /// global roughness knob at generation time. Default mid.
+        var roughness: Double = 0.5
     }
 
     /// Ground cover — plains, dunes, or marsh (§07.3.6). `ring` is the region area.
@@ -228,5 +239,5 @@ struct MapAuthoring: Codable {
     // Convenience accessors used by the generator and validators.
     var lakes: [MapRegion.Lake] { regions.compactMap { if case .lake(let l) = $0 { return l }; return nil } }
     var rivers: [MapRegion.River] { regions.compactMap { if case .river(let r) = $0 { return r }; return nil } }
-    var coast: MapRegion.Coast? { for r in regions { if case .coast(let c) = r { return c } }; return nil }
+    var coasts: [MapRegion.Coast] { regions.compactMap { if case .coast(let c) = $0 { return c }; return nil } }
 }
