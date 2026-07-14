@@ -42,7 +42,7 @@ Nobody writes outside their column. Collin and Rooster and Jeremiah never edit f
 
 5. **Rooster** reviews the implementation for bugs, edge cases, and quality — read-only, reports findings, never edits.
 
-6. **Jeremiah** verifies the feature in the Simulator from a real user's perspective.
+6. **Jeremiah** verifies the feature in the Simulator from a real user's perspective — driven by a tightly-scoped flow (see token discipline).
 
 ## For small fixes and tweaks
 
@@ -62,6 +62,7 @@ The pipeline exists to ship correct code — none of the rules below may weaken 
 - **Tier the pipeline by default.** Full pipeline: new UI *and* new architecture. Middle path (user's request is the story; skip Collin; mockups only if genuinely new visual language): user-specced features. Light path: content, fixes, chores. When in doubt between two tiers, ask the user — it's one sentence.
 - **Mockups stay at 2–3 variants with full state coverage** (user decision: three variants, not fewer — the state coverage has caught real defects).
 - **Rooster's FIRST pass is always full for features.** His RE-verification after rework is skipped only when every finding was Low severity — Jeremiah's QA covers the behavior; keep the re-pass for any High/Medium finding.
+- **Jeremiah always gets a tightly-scoped test flow, never "test the app."** Before invoking him, the implementer (Dan) — or Jake — writes the exact flow, derived from the surfaces the diff actually touched: the shortest, most tap-reliable path to reach the changed surface in each relevant state, plus a checklist where each item ties to something the change altered. Hand that to Jeremiah close to verbatim. This keeps him from wandering into untouched flows and burning the run on navigation/tap-reliability (a real failure on KAN-27, where an unscoped brief left him retry-tapping the catalog/debug/lifecycle and never reaching the marker). If a needed state isn't reachable through seeded data or normal navigation, the flow says so rather than sending him to flail.
 - **Jira: one comment per phase-pair** (story+PRD, mockups+pick, implementation+review, QA+ship) rather than per stage; keep them tight. Doc mirror refreshes happen once at ticket close, batched across tickets when several close together.
 - **Agent reports: cap at what the next role needs to act.** Findings/rulings in full; narrative at a minimum. The coordinator's prompts should say so.
 
