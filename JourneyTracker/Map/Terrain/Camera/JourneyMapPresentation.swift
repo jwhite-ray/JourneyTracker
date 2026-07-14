@@ -18,7 +18,11 @@ import CoreGraphics
 
 struct JourneyMapPresentation {
     let authoring: MapAuthoring
-    let scene: TerrainScene
+    /// The generated terrain. `var` only so `applyingProgress` can swap the small
+    /// `pins` array to runtime states (KAN-21) — the terrain buckets the geometry
+    /// cache is derived from (coasts / rivers / lakes) are never touched, so the
+    /// cache stays valid without a rebuild.
+    var scene: TerrainScene
     /// The scene's geometry cache (KAN-24): the smoothed sea polygons, coast seaward
     /// normals, river shore truncations, and per-home sea test, derived ONCE here so
     /// the camera's per-frame `MapRenderPlanner.plan` only projects + culls + thins.
@@ -41,6 +45,47 @@ struct JourneyMapPresentation {
 
     /// Miles per map unit for this journey (0 if there's no measurable path).
     var milesPerMapUnit: Double { authoring.milesPerMapUnit }
+
+    // MARK: - Real progress (KAN-21)
+
+    /// A copy reflecting the journey's live progress: `markerMiles` clamped to the
+    /// journey, and the waypoint pins restyled from that mileage. The expensive
+    /// pieces — the generated `scene` terrain and its `geometry` cache — are reused
+    /// verbatim (a struct copy is COW-cheap), and only the marker scalar and the
+    /// O(waypoints) `pins` array change. So a screen builds the presentation ONCE
+    /// and calls this every render as HealthKit progress arrives, never rebuilding
+    /// the scene or the cache.
+    func applyingProgress(markerMiles miles: Double) -> JourneyMapPresentation {
+        var copy = self
+        copy.markerMiles = min(max(miles, 0), authoring.journeyMiles)
+        copy.scene.pins = Self.runtimePins(authoring: authoring, markerMiles: copy.markerMiles)
+        return copy
+    }
+
+    /// Waypoint pin states derived from REAL progress, overriding the authoring
+    /// fixture's baked preview states (App Concept doc: the map reads progress).
+    /// `reached` iff the waypoint's mileage is at/behind the marker; the first
+    /// unreached is `next`; the rest `upcoming`. The authored `isDestination` flag
+    /// and accent token are preserved so §07's destination-always-labeled chip and
+    /// per-waypoint accents still render.
+    static func runtimePins(authoring: MapAuthoring, markerMiles: Double) -> [TerrainPin] {
+        let ordered = authoring.waypoints.sorted { $0.milesFromStart < $1.milesFromStart }
+        var assignedNext = false
+        return ordered.map { wp in
+            let state: TerrainPin.State
+            if wp.milesFromStart <= markerMiles + 0.0001 {
+                state = .reached
+            } else if !assignedNext {
+                assignedNext = true
+                state = .next
+            } else {
+                state = .upcoming
+            }
+            return TerrainPin(position: wp.position, name: wp.name,
+                              accentToken: wp.accentToken, state: state,
+                              isDestination: wp.isDestination)
+        }
+    }
 
     private func mapUnits(forMiles miles: Double) -> CGFloat {
         guard milesPerMapUnit > 0 else { return 0 }
