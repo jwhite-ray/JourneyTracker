@@ -115,6 +115,12 @@ enum TerrainRenderer {
     /// plan's stats (drawn / culled / thinned counts) for the perf overlay. This
     /// is the entry the P3 surfaces use; the P1 specimen / P2 harness keep calling
     /// the aspect-fit `render(_:into:size:palette:)` above, unchanged.
+    /// ⚠️ CONVENIENCE / TEST ENTRY ONLY. This BUILDS the per-scene geometry cache on
+    /// every call (`MapSceneGeometry(scene)` — the ~ms one-time work KAN-24 hoisted
+    /// out of the frame), so it must NOT be driven from a gesture loop. The shipping
+    /// surfaces build the cache once (in `JourneyMapPresentation`) and call
+    /// `MapRenderPlanner.plan(_:geometry:…)` + `drawPlanned` directly; a per-frame
+    /// caller must do the same.
     @discardableResult
     static func render(_ scene: TerrainScene,
                        into context: inout GraphicsContext,
@@ -123,7 +129,9 @@ enum TerrainRenderer {
                        milesPerMapUnit: Double = 0,
                        palette: TerrainPalette,
                        lod: MapLOD = MapLOD()) -> TerrainRenderStats {
-        let (projected, stats) = MapRenderPlanner.plan(scene, camera: camera, viewport: viewport,
+        let geometry = MapSceneGeometry(scene)
+        let (projected, stats) = MapRenderPlanner.plan(scene, geometry: geometry, camera: camera,
+                                                       viewport: viewport,
                                                        milesPerMapUnit: milesPerMapUnit, lod: lod)
         drawPlanned(projected, into: &context, viewport: viewport, palette: palette)
         return stats
@@ -402,7 +410,30 @@ enum TerrainRenderer {
                                   into ctx: inout GraphicsContext,
                                   palette: TerrainPalette) {
         guard coast.coastline.count >= 2 else { return }
-        // The sampled shore + its fill polygon (shore + seaCorners), computed once.
+
+        // CAMERA PATH (KAN-24): the smoothed shore and its per-vertex seaward units
+        // arrive precomputed and projected (`sampled` / `bandSeaward`), so the depth
+        // bands are just `sampled[i] + bandSeaward[i] * offset` — no per-frame
+        // re-sampling and no point-in-sea probing (which on the organic Windrise
+        // coast cost hundreds of ms per frame). The band OFFSET stays in screen points
+        // (10 / 22), so the bands are the same fixed width at every zoom, identical to
+        // the authored path below.
+        if coast.sampled.count >= 2, coast.bandSeaward.count == coast.sampled.count {
+            let sampled = coast.sampled
+            seaBandFromUnits(sampled, seawardUnit: coast.bandSeaward, seaCorners: coast.seaCorners,
+                             offset: 0, color: palette.water.highlight, into: &ctx)
+            seaBandFromUnits(sampled, seawardUnit: coast.bandSeaward, seaCorners: coast.seaCorners,
+                             offset: 10, color: palette.water.base, into: &ctx)
+            seaBandFromUnits(sampled, seawardUnit: coast.bandSeaward, seaCorners: coast.seaCorners,
+                             offset: 22, color: palette.water.shadow, into: &ctx)
+            let shore = smoothedPath(coast.coastline, closed: false)
+            ctx.stroke(shore, with: .color(palette.surf),
+                       style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+            return
+        }
+
+        // AUTHORED PATH (P1 specimen / P2 harness, aspect-fit): compute the sampled
+        // shore + its fill polygon and resolve the seaward side per vertex here.
         // Depth bands offset each shore SAMPLE along its own per-vertex seaward
         // normal — so on a wrapped/L-shaped sea the bands follow the coast around
         // the corner instead of shearing into self-intersecting shards (KAN-23).
@@ -436,6 +467,35 @@ enum TerrainRenderer {
         let shifted = offset == 0
             ? sampled
             : MapGeometry.offsetSeaward(sampled, seaPoly: seaPoly, seawardHint: seaward, offset: offset)
+        fillSeaBand(shifted, seaCorners: seaCorners, color: color, into: &ctx)
+    }
+
+    /// A depth band from precomputed per-vertex seaward units (KAN-24 camera path):
+    /// each vertex is offset seaward by the fixed screen `offset`, then the strip is
+    /// closed out to the two sea corners and filled.
+    private static func seaBandFromUnits(_ sampled: [CGPoint],
+                                         seawardUnit: [CGVector],
+                                         seaCorners: [CGPoint],
+                                         offset: CGFloat,
+                                         color: Color,
+                                         into ctx: inout GraphicsContext) {
+        if offset == 0 {
+            fillSeaBand(sampled, seaCorners: seaCorners, color: color, into: &ctx)
+            return
+        }
+        var shifted: [CGPoint] = []
+        shifted.reserveCapacity(sampled.count)
+        for i in 0..<sampled.count {
+            shifted.append(CGPoint(x: sampled[i].x + seawardUnit[i].dx * offset,
+                                   y: sampled[i].y + seawardUnit[i].dy * offset))
+        }
+        fillSeaBand(shifted, seaCorners: seaCorners, color: color, into: &ctx)
+    }
+
+    private static func fillSeaBand(_ shifted: [CGPoint],
+                                    seaCorners: [CGPoint],
+                                    color: Color,
+                                    into ctx: inout GraphicsContext) {
         var path = Path()
         guard let first = shifted.first else { return }
         path.move(to: first)

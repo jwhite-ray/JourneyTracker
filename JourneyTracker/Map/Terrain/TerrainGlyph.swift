@@ -100,6 +100,14 @@ struct TerrainCoast {
     var coastline: [CGPoint]
     var seaward: CGVector
     var seaCorners: [CGPoint]
+    /// CAMERA-PATH render kit (KAN-24), empty for P1/P2 authored coasts. When
+    /// present, the renderer draws the depth bands straight from these precomputed,
+    /// already-projected values instead of re-sampling the coastline and probing the
+    /// sea polygon per vertex every frame: `sampled` is the projected smoothed shore
+    /// (detail-LOD decimated) and `bandSeaward[i]` its seaward unit direction, so a
+    /// band is just `sampled[i] + bandSeaward[i] * offset`.
+    var sampled: [CGPoint] = []
+    var bandSeaward: [CGVector] = []
 }
 
 /// Plains ground cover (§07.3.6): a low-opacity wash blob. Tufts that dot it are

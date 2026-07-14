@@ -160,6 +160,18 @@ struct DebugView: View {
                     .toolbar(.hidden, for: .navigationBar)
             }
             .accessibilityIdentifier("debug.emberSpireScale")
+
+            // KAN-23: the first hand-drawn-map journey ("Road to The Windrise
+            // Peaks"), digitized from Justin's drawing. Opens into the full-screen
+            // gesture surface framed on the opening western leg (chapter view), with
+            // the perf overlay available.
+            NavigationLink("Road to The Windrise Peaks (KAN-23)") {
+                FullScreenMapView(presentation: Self.windrisePresentation,
+                                  initialFraming: .chapter,
+                                  showsPerfOverlay: true)
+                    .toolbar(.hidden, for: .navigationBar)
+            }
+            .accessibilityIdentifier("debug.windrisePeaks")
         }
     }
 
@@ -181,16 +193,27 @@ struct DebugView: View {
         scene: MapGenerator.generateUnchecked(stressAuthoring),
         markerMiles: EmberSpireScaleFixture.defaultMarkerMiles)
 
+    /// The KAN-23 hand-drawn pilot map ("Road to The Windrise Peaks"), marker on
+    /// the opening western leg so chapter framing shows the first stretch.
+    private static let windriseAuthoring = WindrisePeaksMap.make()
+    private static let windriseViolations = MapValidator.validate(windriseAuthoring)
+    private static let windrisePresentation = JourneyMapPresentation(
+        authoring: windriseAuthoring,
+        scene: MapGenerator.generateUnchecked(windriseAuthoring),
+        markerMiles: WindrisePeaksMap.defaultMarkerMiles)
+
     /// The KAN-20 fixtures build via `generateUnchecked`, so this section makes the
     /// "passes validators" claim REAL: a red row (and a debug assertion) surfaces
     /// any regression instead of silently shipping a broken map.
     @ViewBuilder
     private var mapFixtureValidationSection: some View {
-        Section("Map fixtures (KAN-20)") {
+        Section("Map fixtures") {
             fixtureValidationRow("Sample leg (~30 mi)", Self.sampleViolations,
                                  identifier: "debug.mapFixture.sample")
             fixtureValidationRow("Ember Spire scale (1,800 mi)", Self.stressViolations,
                                  identifier: "debug.mapFixture.stress")
+            fixtureValidationRow("Road to The Windrise Peaks (KAN-23)", Self.windriseViolations,
+                                 identifier: "debug.mapFixture.windrise")
         }
     }
 

@@ -1,4 +1,4 @@
-# JourneyTracker — Design System v1.10
+# JourneyTracker — Design System v1.11
 
 **Status:** living document · owned by Jeff (design) · iOS · SwiftUI
 **Scope:** this document passes **style only** — color, type, shape, layout, the character rig, and the faceted terrain/cartography system. It does not define behavior, data models, units, or progress math. Those live in `docs/JourneyTracker_App_Concept.md`, which wins on any such question.
@@ -25,7 +25,9 @@ Every step you walk carries a wayfarer closer to the summit along the 1,800-mile
 
 > **v1.9 change log.** Ported the KAN-23 organic-detail pass (Justin's "the drawing trumps the rules" pilot-map ruling, App Concept doc) into §07: **(1)** §07.5's river-termination rule is rewritten — a river's source may now rise anywhere on land (an upland spring, partway up a range, or off-canvas), never in water, and it ends in a lake, at the coastline (melting per §07.3.3), or by exiting the map edge as an off-map drainage (drawn full-width to the world border and clipped there, §07.7); the prior wording ("a river always starts off-canvas or in a mountain range, and always ends either in a lake or abruptly at the coastline") is gone, not left alongside the new rule. Mouths still melt (§07.3.3) — an off-map exit is a clean edge-clip, not a melt. **(2)** New organic-detail visual language, purely stylistic (the underlying generator remains Jake's): §07.3.5 coasts gain multi-octave "organic displacement" (coves/headlands plus finer wobble, wander capped at ~2 real miles, pinned to zero at river mouths and shoreside villages, one 0–1 roughness knob); §07.3.3 rivers gain layered meanders (on-canvas drawn length up to ~1.5× the authored line, several true bends) and small tributaries (1.3–3 mi thin side-streams, melting into the main stem at a confluence with the same no-cap mouth recipe as §07.3.3's river mouths); §07.3.7 trek-path and road linework gain a subtle hand-wave (~0.12 mi amplitude, easing to zero at every waypoint) so traced segments never render ruler-straight. **(3)** §07.3.1 notes that short ranges/hill-chains (15–300 mi, the App Concept doc's KAN-23-loosened bound) currently render with the same mountain glyph at lower stature — a dedicated hills glyph stays an open future design option, not shipped here. **(4)** §07.5's "villages sit next to water" is downgraded from a hard placement rule to a design **preference**: the App Concept doc's ≤40-mile settlement cap is a sanity guard against absurd inland distance, not an aesthetic mandate, so a legitimate inland market or road town is not a violation.
 
-> **v1.10 change log.** Ported the finalized KAN-27 Wren redesign into §02 and §04: **(1)** `char/cloak` is retinted Cloak Brown `#7A6A4F` → **Fernwood Moss `#5F6B4D`** (same token, new hue — still the neutral prop tone for cloak, staff, pack, and back arm). **(2)** New character-color token **`char/hair` = `#8B5A34` "Chestnut Curl"**, added to §02, for the curly-hair facets. **(3)** The old pentagon "hood" (it read as a bishop's mitre) is removed from the construction order and fixed proportions; Wren is now bare-headed with a cluster of small faceted circles for curly hair, hugging the crown with a fringe just above the brows, ears still visible at the sides. **(4)** The mid-walk emotional state changes from "Determined" (brows angled in-down) — which read as angry — to a neutral/calm expression: soft-raised brows, gaze directed up-and-forward, forward lean retained. **(5)** A thin skin-tone lower eyelid is added to the eye spec, clipped to the eye circle — the no-mouth hard rule is unaffected, the lid is part of the eye, not a mouth.
+> **v1.10 change log.** Canonicalized waypoint pin rendering (Justin's KAN-21 ruling during Phase 4 review, 2026-07-13): the faceted teardrop-and-chip pin anatomy already drawn on terrain-authored maps — teardrop body with a hard offset shadow; reached = solid `journey.theme.accentColorToken` fill + `surface/card` center dot; next = the same solid fill plus an `accent/reward` emphasis ring and an always-shown Cinzel chip; further-unreached = 2pt dashed `ink` outline at 60%, no fill, no dot, no chip; destination = its chip always shows, whatever its state — is now **the single rendering for every map surface**, not just the terrain Canvas. This explicitly includes the KAN-7 pin-and-route screen, which remains the fallback for journeys without authored map art: it now draws the identical anatomy as SwiftUI shapes rather than its own callout language. New **§07.8 "Waypoint pin & chip anatomy"** documents the shared geometry once, for any renderer (Canvas draw pass or SwiftUI shape stack) that draws it; former §07.8 "Handoff notes" is renumbered **§07.9**, nothing in it changed. §08's "Waypoint & marker states" is reworked to hold **state semantics only** (reached/next/further-unreached/destination), pointing at §07.8 for how each state actually renders, and its old "pin/badge shape is still open" framing is gone. The original KAN-7 mockup's callout language — the `WaypointCallout` name bubble (radius 5, 1.5pt stroke, no facet shadow) and the checkmark/star SF Symbol glyphs drawn inside `WaypointPin`'s reached/completed states — is now flagged **dead** in §07.8 and §08: it describes no shipping surface as of this ruling. §06's pin sentence is likewise replaced with a pointer to §07.8 rather than a second, now-stale restatement of pin geometry. **Correction (Rooster's review):** the §08 button label list and Kebab-menu note still read "View Map" from before the KAN-21 journey-view naming ruling; both are corrected here to "View Journey."
+
+> **v1.11 change log.** Ported the finalized KAN-27 Wren redesign into §02 and §04: **(1)** `char/cloak` is retinted Cloak Brown `#7A6A4F` → **Fernwood Moss `#5F6B4D`** (same token, new hue — still the neutral prop tone for cloak, staff, pack, and back arm). **(2)** New character-color token **`char/hair` = `#8B5A34` "Chestnut Curl"**, added to §02, for the curly-hair facets. **(3)** The old pentagon "hood" (it read as a bishop's mitre) is removed from the construction order and fixed proportions; Wren is now bare-headed with a cluster of small faceted circles for curly hair, hugging the crown with a fringe just above the brows, ears still visible at the sides. **(4)** The mid-walk emotional state changes from "Determined" (brows angled in-down) — which read as angry — to a neutral/calm expression: soft-raised brows, gaze directed up-and-forward, forward lean retained. **(5)** A thin skin-tone lower eyelid is added to the eye spec, clipped to the eye circle — the no-mouth hard rule is unaffected, the lid is part of the eye, not a mouth.
 
 ---
 
@@ -150,13 +152,13 @@ Core glyphs: **Steps** · **Ember Spire** · **The Emberstone** (the journey's r
 
 ## 06 · Journey map
 
-Top-down parchment map. Dot-dash ink trail (8px on / 6px off — in SwiftUI, `StrokeStyle(lineWidth: 3, dash: [8, 6])`). Pin fill = the milestone's accent color, 3px ink stroke, 2px offset shadow. Segment lengths reflect real relative distances along the route.
+Top-down parchment map. Dot-dash ink trail (8px on / 6px off — in SwiftUI, `StrokeStyle(lineWidth: 3, dash: [8, 6])`). Waypoint pins render per §07.8's canonical teardrop-and-chip anatomy (KAN-21) — this section covers the trail stroke and segment scaling only, not pin geometry. Segment lengths reflect real relative distances along the route.
 
 Waypoints in order: Thistledown · Crosswater · Silvergate · The Deepdelve · Whisperwood · The Windmark · Whitewatch · Ember Spire
 
 Their canonical distances live in the App Concept doc and ship as journey data — not as constants in this file or in view code.
 
-**This section covers the trail line and waypoint pins.** What sits *underneath* them — the faceted mountains, forests, rivers, lakes, coastline, ground cover, roads, and settlements that make the map a place instead of a line on parchment — is specified in full in §07, Terrain & cartography. The dot-dash trail above and the trek-path recipe in §07.3.7 are the same stroke; §07 just gives it a name in the fixed draw order.
+**This section covers the trail line only.** Waypoint pin geometry is specified once, in §07.8, since KAN-21 made it identical on every map surface. What sits *underneath* the trail and pins — the faceted mountains, forests, rivers, lakes, coastline, ground cover, roads, and settlements that make the map a place instead of a line on parchment — is specified in full in §07, Terrain & cartography. The dot-dash trail above and the trek-path recipe in §07.3.7 are the same stroke; §07 just gives it a name in the fixed draw order.
 
 ---
 
@@ -219,7 +221,7 @@ All three also carry a subtle **hand-wave** displacement (KAN-23 organic pass) a
 **07.3.8 · Settlements**
 A village is a tight cluster of 3–5 tiny homes (~11–16pt each), each home a cream wall (`surface/card`) + a faceted roof in `terrain/roof` (ridge-split, per §07.1) + a 1–2pt ink border, base-anchored like the mountains. Clusters are small enough to read as "a place," not a scatter — see §07.4 for why settlements don't follow the same feathered-mass treatment as ranges and forests.
 
-Waypoint pins and their Cinzel name chips (§06) are not part of this vocabulary — they're UI, not terrain, and always draw last, above every element in §07.5's order. Pin body state (reached/next/upcoming) and which pins carry a static name chip — always the destination, always the single "next" — are specified in §08's "Waypoint & marker states," not here.
+Waypoint pins and their Cinzel name chips (§07.8) are not part of this vocabulary — they're UI, not terrain, and always draw last, above every element in §07.5's order. Pin body state (reached/next/upcoming) and which pins carry a static name chip — always the destination, always the single "next" — are specified in §08's "Waypoint & marker states" for semantics and §07.8 for anatomy, not here.
 
 ### 07.4 · The scatter aesthetic — hard contract
 
@@ -243,8 +245,8 @@ These are visual grammar — how elements relate to each other on the page — n
 - At any confluence — river into lake, river into ocean, river into a tributary, or water meeting itself anywhere on the map — the join **melts** per §07.3.3's mouth recipe: no hard edge, cap, or seam where two water fills meet. An off-map exit is the one exception: it's a clean edge-clip at the world border, not a melt — there's no receiving water there to melt into.
 - Roads and the trek path stay on land. They never cross a lake or ocean fill.
 - Villages **prefer** to sit near water — a river bank, a lake shore, or a coastline — as a design preference, not a hard placement rule (KAN-23). The App Concept doc's ≤40-mile settlement-to-water cap is a sanity guard against a village placed absurdly far inland, not an aesthetic "must hug the shore" mandate — a legitimate market or road town sited well inland (up to that cap) is not a violation of this look-rule, it's geography the preference simply doesn't happen to apply to.
-- Waypoint pins sit **on** the trek path line itself — the teardrop tip anchors to the path, never floating beside it. (The App Concept doc owns the data rule that puts waypoints on the path; this is that rule's visual expression.)
-- Waypoint pins and their Cinzel chips (§06) sit above every terrain element, always, regardless of what's underneath them. See §08's "Waypoint & marker states" for which pins carry a name chip by default — the destination waypoint always does, alongside whichever single waypoint is currently "next."
+- Waypoint pins sit **on** the trek path line itself — the teardrop tip anchors to the path, never floating beside it. (The App Concept doc owns the data rule that puts waypoints on the path; this is that rule's visual expression.) Full pin anatomy — teardrop, shadow, dot, ring, chip — is specified once, in §07.8.
+- Waypoint pins and their Cinzel chips (§07.8) sit above every terrain element, always, regardless of what's underneath them. See §08's "Waypoint & marker states" for which pins carry a name chip by default — the destination waypoint always does, alongside whichever single waypoint is currently "next."
 
 ### 07.6 · Fixed draw order
 
@@ -264,7 +266,29 @@ Outside the line is bare `bg/parchment` letterbox — no terrain, no fill, nothi
 
 **Deepdark.** Like the trek path and every other piece of terrain linework, the border is drawn in the `ink` token — it inverts with the rest of Deepdark's linework (§02) automatically, never a fixed literal.
 
-### 07.8 · Handoff notes
+### 07.8 · Waypoint pin & chip anatomy (KAN-21 canonicalization)
+
+One shared pin recipe, drawn identically wherever a journey map appears. A terrain-authored map's `Canvas` draw pass and the KAN-7 pin-and-route screen (the fallback for journeys without authored map art) both draw this exact anatomy — same geometry, same tokens, same states — whether the surface renders it as Canvas fills/strokes or as an equivalent SwiftUI shape stack. There is no longer a terrain-only pin and a separate "UI" pin; there is one pin.
+
+**Silhouette.** A teardrop: a round head above the anchor point, tapering to a point at the tip. The tip is the pin's true position — it's what sits **on** the trek path per §07.5 — not the head. The head is sized to hold a small center dot (Reached/Next states) without crowding it.
+
+**Hard offset shadow.** Reached and Next pins sit on a second, solid dark copy of the same teardrop, nudged down-and-right, no blur — the same hard-offset-shadow trick §07.1 gives mountains and §09 names as a layout token, never a soft/blurred shadow. Further-unreached pins, being outline-only, cast no shadow — there's no filled shape to cast one from.
+
+**Reached / passed.** Teardrop filled solid `journey.theme.accentColorToken`, 3pt `ink` stroke, 100% opacity, plus a small `surface/card`-colored dot centered in the head. The dot is what reads as "marked," distinct from an unreached pin's bare outline. No chip by default (see Destination, below).
+
+**Next (the single upcoming waypoint).** Same solid fill, stroke, and center dot as Reached, **plus** an `accent/reward` emphasis ring traced around the head, and its Cinzel name chip always shown — not tap-to-reveal. There is ever exactly one "next" pin on a map.
+
+**Further unreached.** Outline only: 2pt `ink` stroke, dashed, at 60% opacity. No fill, no center dot, no hard offset shadow, and no chip by default — the same "locked" visual language as milestone badges (§08).
+
+**Destination.** The journey's final waypoint always shows its Cinzel chip, in every state — reached, next, or further-unreached — per §08's destination rule. The chip is additive only: the pin *body* still renders exactly per whichever state above applies (an unreached destination keeps the dashed, 60%-opacity outline; its chip simply floats above it regardless).
+
+**The Cinzel chip.** A small rounded-rectangle label anchored above the pin's head: `surface/card` fill, radius 7, 2pt `ink` stroke, the waypoint name in Cinzel-register serif bold at ~11pt, `ink`. Sized to its own text — never a fixed width that clips a long name — with consistent padding so short and long names both read comfortably. This chip is the only waypoint-name treatment on any map; there is no separate "callout bubble" shape.
+
+**Dead: the original KAN-7 mockup's callout language.** The KAN-7 mockup era's `WaypointCallout` — a smaller rounded-rectangle bubble (radius 5, 1.5pt stroke, no facet shadow) — and the checkmark/star SF Symbol glyphs drawn inside `WaypointPin`'s reached/completed states are **superseded**. Neither describes any surface as of this ruling; the Cinzel chip and the center-dot/emphasis-ring recipe above are the only rendering, on every screen.
+
+Draw order and z-index (pins always last, above the world-edge border) are unchanged — see §07.6 and §07.7.
+
+### 07.9 · Handoff notes
 
 **Rendering.** SwiftUI `Canvas` draw passes only — shape stacks per glyph, not a view per glyph. A forest of 40 conifers is 40 small `Path` fills inside one `Canvas`, never 40 `ConiferView` instances in a `ForEach`.
 
@@ -282,7 +306,7 @@ Outside the line is bare `bg/parchment` letterbox — no terrain, no fill, nothi
 
 **Progress bar** — h22 · border 3 ink · radius 999 · fill `accent/primary` + hatch. Label reads `342 / 1,800 mi`.
 
-**Buttons** — radius 12 · border 3 · fill `journey.theme.accentColorToken` + crisp 3pt ink stroke, no shadow (KAN-8 — the hard drop shadow read as a doubled border at button size). Press state: translate down 2pt, no shadow to collapse. Labels: "Start Journey," "View Map."
+**Buttons** — radius 12 · border 3 · fill `journey.theme.accentColorToken` + crisp 3pt ink stroke, no shadow (KAN-8 — the hard drop shadow read as a doubled border at button size). Press state: translate down 2pt, no shadow to collapse. Labels: "Start Journey," "View Journey" (renamed from "View Map" per the KAN-21 journey-view naming ruling).
 
 **Milestone badges** — earned: `accent/reward` border. Locked: dashed border, 60% opacity.
 
@@ -292,14 +316,15 @@ Outside the line is bare `bg/parchment` letterbox — no terrain, no fill, nothi
 
 **Reached-waypoint timeline (KAN-14).** The map's per-instance log of reached waypoints, below the stat tile grid: one row per reached waypoint, each with a tick dot on a connecting vertical ink rail (echoing the map's own dot-dash trail), the waypoint name, its date reached, and time taken since the previous waypoint. **Every row's tick renders filled and checked, with no exception** — presence in this log already means the waypoint was reached, so the tick communicates that fact uniformly. A waypoint crossed before crossing-tracking existed (no recorded `crossedAt`) is **never** shown with an empty or unchecked tick, which would visually contradict a log titled "reached" — instead its date line reads "date not recorded," and its time-taken line degrades the same way, as plain text. The tick is never the carrier of missing-data information; only the text is.
 
-**Waypoint & marker states (KAN-7)** — the token/opacity language a journey map uses to tell reached from upcoming, regardless of whether a given screen renders waypoints as pins, badges, or dots. Pin/badge *shape* is still open pending the KAN-7 mockup direction; this table is the part that's shared across all of them. Whatever shape ships, it draws above the terrain layer beneath it — labels and pins are always last in §07's fixed draw order (§07.6); this table only governs the states of the pins themselves, not what's underneath them:
+**Waypoint & marker states (KAN-7 semantics; KAN-21 canonical rendering)** — the state semantics a journey map uses to tell reached from upcoming: reached, next, further-unreached, destination. As of the KAN-21 ruling, rendering is no longer screen-specific or open — every map surface draws the exact same pin anatomy specified in **§07.8** (teardrop silhouette, hard offset shadow, center dot, emphasis ring, dashed outline, Cinzel chip): the terrain Canvas draws it in-canvas, and the KAN-7 pin-and-route fallback screen (for journeys without authored map art) draws the identical geometry as SwiftUI shapes. This table is the **state-semantics reference only** — for what a state actually looks like, see §07.8, which also **supersedes** the KAN-7 mockup era's separate callout-bubble/checkmark-glyph visual language; that language is dead and describes no shipping surface. Whatever the state, the pin draws above the terrain layer beneath it — pins are always last in §07's fixed draw order (§07.6):
 
-| State | Fill | Stroke | Opacity | Notes |
-|---|---|---|---|---|
-| Reached / passed | `journey.theme.accentColorToken` | 3pt ink (2pt if a smaller badge) | 100% | Optional small ink checkmark/glyph. |
-| Next (the single upcoming waypoint) | `journey.theme.accentColorToken`, or `accent/reward` for the badge/ring itself | 3pt ink + an `accent/reward` emphasis ring or larger scale | 100% | One of two waypoints whose name label is always shown, not just on tap — the other is the destination (see below). There is ever exactly one "next." |
-| Further unreached | none (outline only) | 2pt ink, dashed | 60% | Same locked language as milestone badges (§08). No name label by default — **except** the destination waypoint, which always shows its chip even while further-unreached (see below). |
-| Completed-journey final waypoint | `accent/reward` | 3pt ink | 100% | Marker (Wren) is parked here, posed "fresh" (raised brows, no forward lean) with an `accent/reward` ring or pixel glyph attached — must read as *stopped*, distinct from mid-route "calm/neutral"/"worn out" walking poses. |
+| State | Semantics | Rendering |
+|---|---|---|
+| Reached / passed | Already walked past this waypoint. | Per §07.8's "Reached" recipe. |
+| Next (the single upcoming waypoint) | The one waypoint currently being walked toward — there is ever exactly one. | Per §07.8's "Next" recipe. Name chip always shown, not tap-to-reveal — the other waypoint whose chip is always shown is the destination (see below). |
+| Further unreached | Not yet next, not yet reached. | Per §07.8's "Further unreached" recipe — outline only, no chip by default. Same locked language as milestone badges (§08) — **except** the destination waypoint, which always shows its chip even while further-unreached (see below). |
+| Destination | The journey's final waypoint, whatever its other state. | Pin body follows its own row above exactly; its Cinzel chip always shows regardless of state — see the destination label rule below. |
+| Completed-journey final waypoint | The journey is finished; the wayfarer marker is parked at the destination. | Same solid-teardrop-with-dot recipe as "Reached" (§07.8), filled `accent/reward` instead of the journey's theme accent. Wren himself — a separate system, §04 / §07.9 — is posed "fresh" (raised brows, no forward lean) beside it with an `accent/reward` ring or pixel glyph attached, and must read as *stopped*, distinct from mid-route "calm/neutral"/"worn out" walking poses. |
 
 **Destination label rule (Gate 1 ruling, KAN-18).** The journey's destination waypoint — the final one, e.g. Ember Spire — always shows its Cinzel name chip, in every state: reached, next, or further-unreached. This replaces the earlier rule that "next" was the *only* waypoint always labelled; now next **and** the destination both are, and there is no longer a state in which the destination's name is tap-to-reveal. The chip is additive only — it never changes the destination's pin *body*, which still follows its row above exactly like any other waypoint in that state (an unreached destination keeps the dashed-outline, 60%-opacity treatment from the "Further unreached" row; its name chip simply floats above that outline instead of being withheld).
 
@@ -312,7 +337,7 @@ Per-status stroke, 3pt unless noted:
 - **Paused** — `ink` stroke at reduced opacity (the stamp itself is muted, not just its stroke color — treat the whole stamp at ~60% opacity to read as dormant against an Active card).
 - **Completed** — `accent/reward` stroke, 4pt (the one status that steps up stroke weight), plus the §05 pixel Emberstone glyph (6×6 grid, strict cells, no anti-aliasing) inline before the label. This is the only status with an icon — it's the celebratory one and should read as an award, not a fourth text label.
 
-**Kebab (•••) action menu (KAN-10).** Secondary lifecycle actions (Pause, Resume, Restart) collapse behind a single kebab button so the card surface stays to name, status, progress, and the primary "View Map" action. Kebab button: 32×32 square, radius 10, `surface/card` fill, 3pt `ink` stroke, centered `ellipsis` glyph.
+**Kebab (•••) action menu (KAN-10).** Secondary lifecycle actions (Pause, Resume, Restart) collapse behind a single kebab button so the card surface stays to name, status, progress, and the primary "View Journey" action (renamed from "View Map" per the KAN-21 journey-view naming ruling). Kebab button: 32×32 square, radius 10, `surface/card` fill, 3pt `ink` stroke, centered `ellipsis` glyph.
 
 Tapping opens an anchored dropdown below the kebab whose leading edge aligns to the kebab's leading edge and extends trailing (x = kebab.minX), clamped to stay ≥12pt from the screen's trailing edge: `surface/card` fill, radius 12, 3pt `ink` stroke, fixed width 190. Rows are label + leading icon, Nunito 600, 13pt, `ink`, 12pt horizontal / 9pt vertical padding, separated by a 1pt `ink`-at-15%-opacity hairline (no divider after the last row). A row representing an action currently unavailable (e.g. "Resume" while another journey is active) renders its full row — icon, label, text — at 40% opacity rather than being hidden, so the option's existence is never a surprise.
 

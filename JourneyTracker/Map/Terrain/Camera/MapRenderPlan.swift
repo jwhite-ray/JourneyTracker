@@ -107,7 +107,6 @@ struct TerrainRenderStats: Equatable {
     var drawnWaterShapes = 0   // lakes + rivers + plains + marsh + coast
     var drawnPaths = 0
     var drawnPins = 0
-    var buildMillis: Double = 0
     /// The LOD keep-fraction this plan used — monotonic non-increasing as zoom
     /// decreases, which is the nesting guarantee ("zooming out only removes").
     var keepFraction: Double = 1
@@ -121,13 +120,27 @@ enum MapRenderPlanner {
     /// Projects `scene` through `camera` into a screen-space scene, culled to
     /// `viewport` and LOD-thinned. The returned scene is drawn as-is by
     /// `TerrainRenderer.drawScene` (identity transform).
+    ///
+    /// `geometry` is the scene's precomputed geometry cache (KAN-24) — smoothed sea
+    /// polygons, coast seaward normals, river shore truncations, and the per-home
+    /// sea test, all derived ONCE. It is a pure derivation of `scene` and MUST have
+    /// been built from this exact `scene` (`MapSceneGeometry(scene)`); it is required
+    /// (not optional) so a caller can never accidentally rebuild the cache per frame.
+    /// `plan` stays a pure function of `(scene, geometry, camera, viewport, lod)`.
     static func plan(_ scene: TerrainScene,
+                     geometry geo: MapSceneGeometry,
                      camera: MapCamera,
                      viewport: CGSize,
                      milesPerMapUnit: Double = 0,
                      lod: MapLOD = MapLOD()) -> (scene: TerrainScene, stats: TerrainRenderStats) {
         var out = TerrainScene()
         var stats = TerrainRenderStats()
+        // Contract: the cache is a derivation of THIS scene. A mismatch (wrong cache
+        // passed) would silently render a wrong map, so fail fast in debug.
+        assert(geo.coasts.count == scene.coasts.count
+               && geo.rivers.count == scene.rivers.count
+               && geo.lakes.count == scene.lakes.count,
+               "MapSceneGeometry does not match the scene it is being planned against")
 
         func P(_ p: CGPoint) -> CGPoint { camera.project(p, in: viewport) }
 
@@ -148,11 +161,33 @@ enum MapRenderPlanner {
         let shapePad = screen.insetBy(dx: -12, dy: -12)
 
         // --- Water & ground shapes: project rings/lines, cull by bounding box ---
-        for coast in scene.coasts {
-            // Coast fills the whole sea side — always keep it.
-            out.coasts.append(TerrainCoast(coastline: coast.coastline.map(P),
-                                           seaward: coast.seaward,
-                                           seaCorners: coast.seaCorners.map(P)))
+        for coastGeo in geo.coasts {
+            // Coast fills the whole sea side — always keep it. Project the cached
+            // smoothed shore and its precomputed seaward units, detail-LOD decimated
+            // by projected spacing so the renderer strokes a screen-appropriate number
+            // of segments (a few hundred), not the full ~3,500 sub-pixel ones — and
+            // never re-derives the seaward normals (KAN-24).
+            let stride = detailStride(count: coastGeo.sampledMap.count,
+                                      mapArc: coastGeo.arcLenMap, zoom: camera.zoom)
+            var sampled: [CGPoint] = []
+            var seaward: [CGVector] = []
+            sampled.reserveCapacity(coastGeo.sampledMap.count / stride + 2)
+            var i = 0
+            while i < coastGeo.sampledMap.count {
+                sampled.append(P(coastGeo.sampledMap[i]))
+                seaward.append(coastGeo.seawardUnit[i]) // uniform-scale ⇒ same screen dir
+                i += stride
+            }
+            // Always anchor the last vertex so the shore reaches its true end.
+            if i - stride != coastGeo.sampledMap.count - 1 {
+                sampled.append(P(coastGeo.sampledMap[coastGeo.sampledMap.count - 1]))
+                seaward.append(coastGeo.seawardUnit[coastGeo.sampledMap.count - 1])
+            }
+            out.coasts.append(TerrainCoast(coastline: coastGeo.controlMap.map(P),
+                                           seaward: coastGeo.seaward,
+                                           seaCorners: coastGeo.seaCornersMap.map(P),
+                                           sampled: sampled,
+                                           bandSeaward: seaward))
             stats.drawnWaterShapes += 1
         }
         for plains in scene.plains {
@@ -171,73 +206,41 @@ enum MapRenderPlanner {
                 stats.drawnWaterShapes += 1
             }
         }
-        // Lakes: keep the map-space smoothed ring (for river-mouth containment) and
-        // the projected ring/bbox (for mouth fitting + the altitude home-over-water
-        // skip), then emit the culled projected blob.
-        struct ProjLake { let mapSmoothed: [CGPoint]; let projRing: [CGPoint]; let projBox: CGRect }
-        var projLakes: [ProjLake] = []
+        // Lakes: project the authored ring/bbox for the culled blob; the map-space
+        // smoothed ring + bbox used for river-mouth containment and the altitude
+        // home-over-water skip live in the geometry cache (KAN-24).
         for lake in scene.lakes {
             let projRing = lake.ring.map(P)
-            let box = boundingBox(projRing)
-            projLakes.append(ProjLake(mapSmoothed: MapGeometry.catmullRomSampledClosed(lake.ring),
-                                      projRing: projRing, projBox: box))
-            if box.intersects(shapePad) {
+            if boundingBox(projRing).intersects(shapePad) {
                 out.lakes.append(TerrainBlob(ring: projRing))
                 stats.drawnWaterShapes += 1
             }
         }
-        // The projected sea polygons (for the home-over-water skip + sea-mouth melt).
-        let projSeas: [[CGPoint]] = scene.coasts.map {
-            MapGeometry.seaPolygon(coastline: $0.coastline, seaCorners: $0.seaCorners).map(P)
-        }.filter { $0.count >= 3 }
-
-        for river in scene.rivers {
-            var line = river.centerline.map(P)
+        // Rivers: the shore truncation is precomputed in MAP space (cache), so per
+        // frame we only PROJECT the already-truncated centerline and apply the
+        // screen-space melt overlap / width taper (KAN-24). Affine-covariant, so the
+        // projected result is identical to the old per-frame screen-space truncation.
+        for (idx, river) in scene.rivers.enumerated() {
+            let rgeo = geo.rivers[idx]
+            let line = rgeo.truncatedMap.map(P)
             // Widths taper with altitude so a river never becomes a highway band.
             var mw = river.mouthWidth * sizeMul
             let sw = river.sourceWidth * sizeMul
-            // MELT AT THE SHORE. The authored/generated mouth point sits INSIDE the
-            // receiving water (the validator requires containment), so the drawn
-            // centerline ran deep into the lake — glaring at high zoom. Instead we
-            // TRUNCATE the projected centerline at the receiver's SHORE (the smoothed
-            // ring the renderer actually fills), then extend only a tiny fixed
-            // overlap past it so no parchment gap ever shows. The bank-width taper in
-            // `drawRiver` still thins the dark banks approaching the water.
             var runIn: CGFloat = 0
-            switch river.mouth {
-            case .freshwater:
-                if let mouthMap = river.centerline.last,
-                   let lake = projLakes.first(where: { MapGeometry.polygonContains(mouthMap, $0.mapSmoothed) }) {
-                    let shore = MapGeometry.catmullRomSampledClosed(lake.projRing)
-                    let projMouth = P(mouthMap)
-                    let inradius = shore.reduce(CGFloat.greatestFiniteMagnitude) {
-                        min($0, MapGeometry.dist(projMouth, $1))
-                    }
-                    // Safety clamp for tiny projected lakes; overlap never exceeds the
-                    // lake so the cap can't cross to the far shore.
-                    mw = min(mw, max(1.0, 1.2 * inradius))
-                    truncateAtShore(&line, inside: shore)
-                    runIn = min(2.5, 0.7 * inradius)
-                }
-            case .sea:
-                // Truncate at whichever sea the mouth actually enters (a map may have
-                // several coasts).
-                if let mouthMap = river.centerline.last,
-                   let sea = projSeas.first(where: { MapGeometry.polygonContains(P(mouthMap), $0) }) {
-                    truncateAtShore(&line, inside: sea)
-                    runIn = min(2.5, mw)
-                } else if let sea = projSeas.first {
-                    truncateAtShore(&line, inside: sea)
-                    runIn = min(2.5, mw)
-                }
-            case .confluence:
-                // A tributary melting into a main river (KAN-23): no lake/sea shore
-                // to truncate at — the junction already sits on the main centerline.
-                // Overlap a short fixed run so the same-tone body reads continuous.
+            switch rgeo.runIn {
+            case .freshwater(let mapInradius):
+                // Inradius is a projected distance ⇒ map inradius × zoom. Clamp the
+                // mouth width and overlap so the cap can't cross a tiny far-zoom lake.
+                let inradius = mapInradius * camera.zoom
+                mw = min(mw, max(1.0, 1.2 * inradius))
+                runIn = min(2.5, 0.7 * inradius)
+            case .mouthWidth:
+                // Sea + confluence mouths: overlap a short fixed run past the shore /
+                // junction so the same-tone body reads fill-continuous.
                 runIn = min(2.5, mw)
-            case .inland, .offMap:
-                // offMap runs full-width to/past the bounds edge; the bounds clip in
-                // `drawPlanned` cuts it there. Nothing to truncate or melt (KAN-23).
+            case .none:
+                // inland / offMap: no melt. offMap runs to the bounds edge and the
+                // `drawPlanned` bounds clip cuts it there.
                 break
             }
             if boundingBox(line).insetBy(dx: -mw - runIn, dy: -mw - runIn).intersects(shapePad) {
@@ -282,11 +285,21 @@ enum MapRenderPlanner {
         // At altitude (taper active) a home's projected footprint can visually spill
         // into a tiny lake/sea even though the generator kept its base dry in map
         // space — so drop such a home. Deterministic (pure function of camera).
+        // • SEA test: precomputed per home in the geometry cache (a home's map base
+        //   and the sea polygons are both scene-invariant), so it's an O(1) set
+        //   lookup instead of a per-frame per-home point-in-sea scan (KAN-24).
+        // • LAKE test: the tapered footprint is zoom-dependent, but the test is done
+        //   in MAP space against the cached lake bboxes — affine-covariant with the
+        //   old projected test, and only a couple of cheap bbox intersects.
         let taperActive = sizeMul < 0.999
-        func homeOverWater(footprint: CGRect, base: CGPoint) -> Bool {
-            if projLakes.contains(where: { $0.projBox.intersects(footprint) }) { return true }
-            if projSeas.contains(where: { MapGeometry.polygonContains(base, $0) }) { return true }
-            return false
+        let invZoom = camera.zoom > 0 ? 1 / camera.zoom : 0
+        func homeOverWater(mapBase: CGPoint, w: CGFloat, h: CGFloat) -> Bool {
+            if geo.homeBasesOverSea.contains(mapBase) { return true }
+            // Screen footprint (base.x - w/2, base.y - h, w, h) mapped back to map units.
+            let mapFootprint = CGRect(x: mapBase.x - (w / 2) * invZoom,
+                                      y: mapBase.y - h * invZoom,
+                                      width: w * invZoom, height: h * invZoom)
+            return geo.lakes.contains { $0.boxMap.intersects(mapFootprint) }
         }
 
         var inViewHomes: [TerrainGlyph] = []
@@ -310,9 +323,7 @@ enum MapRenderPlanner {
                 // stable across zoom/pan (the taper changes size, never membership).
                 if MapLOD.keepRank(for: glyph) < keepFraction { out.glyphs.append(projected) }
             } else {
-                if taperActive,
-                   homeOverWater(footprint: CGRect(x: base.x - w / 2, y: base.y - h, width: w, height: h),
-                                 base: base) { continue }
+                if taperActive, homeOverWater(mapBase: glyph.base, w: w, h: h) { continue }
                 inViewHomes.append(projected)
             }
         }
@@ -337,46 +348,22 @@ enum MapRenderPlanner {
 
     // MARK: - Helpers
 
-    /// Truncates a river centerline at the receiving water's shore: cuts off the
-    /// tail that runs inside `inside` (the smoothed projected ring / sea polygon)
-    /// and ends the line exactly at the shore crossing nearest the mouth. If the
-    /// mouth isn't inside the receiver (e.g. a sea mouth authored just landward of
-    /// the coastline) the line is left as-is. Pure geometry — deterministic.
-    private static func truncateAtShore(_ line: inout [CGPoint], inside ring: [CGPoint]) {
-        guard line.count >= 2, ring.count >= 3, let mouth = line.last,
-              MapGeometry.polygonContains(mouth, ring) else { return }
-        // Walk back from the mouth to the last point still OUTSIDE the water.
-        var idx = line.count - 1
-        while idx >= 0, MapGeometry.polygonContains(line[idx], ring) { idx -= 1 }
-        guard idx >= 0, idx < line.count - 1 else { return }
-        let cross = segmentPolylineEntry(line[idx], line[idx + 1], ring) ?? line[idx + 1]
-        line = Array(line[0...idx]) + [cross]
-    }
-
-    /// The first point (smallest t along a→b) where segment a→b crosses the closed
-    /// polygon `ring`, or nil if it doesn't.
-    private static func segmentPolylineEntry(_ a: CGPoint, _ b: CGPoint, _ ring: [CGPoint]) -> CGPoint? {
-        var bestT = CGFloat.greatestFiniteMagnitude
-        for i in 0..<ring.count {
-            let c = ring[i], d = ring[(i + 1) % ring.count]
-            if let t = segmentIntersectionT(a, b, c, d), t < bestT { bestT = t }
-        }
-        guard bestT <= 1 else { return nil }
-        return CGPoint(x: a.x + (b.x - a.x) * bestT, y: a.y + (b.y - a.y) * bestT)
-    }
-
-    /// Parametric t along a→b at which it crosses segment c→d, or nil.
-    private static func segmentIntersectionT(_ a: CGPoint, _ b: CGPoint,
-                                             _ c: CGPoint, _ d: CGPoint) -> CGFloat? {
-        let r = CGVector(dx: b.x - a.x, dy: b.y - a.y)
-        let s = CGVector(dx: d.x - c.x, dy: d.y - c.y)
-        let denom = r.dx * s.dy - r.dy * s.dx
-        guard abs(denom) > 1e-9 else { return nil }
-        let qp = CGVector(dx: c.x - a.x, dy: c.y - a.y)
-        let t = (qp.dx * s.dy - qp.dy * s.dx) / denom
-        let u = (qp.dx * r.dy - qp.dy * r.dx) / denom
-        guard t >= 0, t <= 1, u >= 0, u <= 1 else { return nil }
-        return t
+    /// Detail-LOD stride for a long projected polyline: a keep-every-nth step chosen
+    /// so the projected samples land ≈`targetScreenSpacing` points apart, rounded
+    /// DOWN to a power of two so successive levels NEST (every level is a subset of a
+    /// denser one) — the same stability rule the scatter LOD uses, so a stride change
+    /// during a gesture drops/re-adds a whole nested layer rather than reshuffling
+    /// vertices. Deterministic: a pure function of the count, map arc length, and
+    /// zoom (KAN-24).
+    private static func detailStride(count: Int, mapArc: CGFloat, zoom: CGFloat,
+                                     targetScreenSpacing: CGFloat = 1.2) -> Int {
+        guard count > 2, mapArc > 0, zoom > 0, targetScreenSpacing > 0 else { return 1 }
+        let screenArc = mapArc * zoom
+        let desiredCount = max(2, Int((screenArc / targetScreenSpacing).rounded(.up)))
+        let rawStride = max(1, count / desiredCount)
+        var s = 1
+        while s * 2 <= rawStride { s *= 2 }
+        return s
     }
 
     private static func boundingBox(_ pts: [CGPoint]) -> CGRect {

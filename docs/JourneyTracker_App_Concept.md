@@ -54,6 +54,8 @@ The design system was originally authored with placeholder names from a well-kno
 
 **Journey 1 — "The Road to Ember Spire"** · `totalDistance` = 1,800 mi (2,896,819 m)
 
+> **Identity under review (KAN-25, 2026-07-13).** After copyright concerns, this journey's narrative identity — its name, waypoints, and theme — is being rethought, because its shape sits close to well-known fictional territory. The entry stays **functional** meanwhile (seeded, startable, renders via the KAN-7 pin-and-route fallback); its faceted-map authoring is deferred until KAN-25 resettles the identity, then goes through the KAN-23 hand-drawn pipeline (see the fantasy-map P4 note). Treat the names below as provisional until KAN-25 lands.
+
 | Order | Waypoint | Cumulative miles |
 |---|---|---|
 | 0 | Thistledown | 0 |
@@ -91,6 +93,23 @@ A mid-length journey with deliberately uneven waypoint spacing (3-mile and 14-mi
 | 2 | Palefire Hollow | 17 |
 | 3 | Lanternrest | 20 |
 
+**Journey 5 — "Road to The Windrise Peaks"** (KAN-23) · `totalDistance` = 302.4 mi (486,665.6 m) · fantasy
+
+The first journey authored through the KAN-23 hand-drawn-map pipeline: Justin drew the world, the coordinator digitized it (source-image pixels as map units, ~6.85 px/mi), and waypoints were placed by his landmark descriptions. Its faceted map authoring ships in `WindrisePeaksMap`, and the journey view renders that faceted map (KAN-21 — this journey is the P4 vehicle); the KAN-7 pin-and-route screen remains only as the fallback for non-authored journeys. Original names, no real-world IP.
+
+| Order | Waypoint | Cumulative miles |
+|---|---|---|
+| 0 | Wavecrest | 0 |
+| 1 | Millhollow | 14.2 |
+| 2 | Sable Ford | 20.9 |
+| 3 | Hallowmere | 72.9 |
+| 4 | Oxbow Crossing | 122.6 |
+| 5 | Thistlewood | 153.9 |
+| 6 | Farrow's Rest | 172.1 |
+| 7 | Stonewash Ford | 218.8 |
+| 8 | Rivergate | 227.7 |
+| 9 | The Windrise Peaks | 302.4 |
+
 **Waypoint map positions (KAN-7).** `positionX`/`positionY` are image-relative normalized coordinates (0…1, origin top-left). These were all `0` in the shipped seed; KAN-7 seeds real placeholder values so the marker interpolation and pin layout can be verified. Exact values are placeholder art (Jeff finalizes against real backgrounds later); the requirement is only that they are distinct, non-colliding, and roughly track `distanceFromStart` so segment interpolation looks natural.
 
 *The Road to Ember Spire:*
@@ -125,6 +144,21 @@ A mid-length journey with deliberately uneven waypoint spacing (3-mile and 14-mi
 | 1 | Foglow Bridge | 0.24 | 0.76 |
 | 2 | Palefire Hollow | 0.74 | 0.26 |
 | 3 | Lanternrest | 0.86 | 0.14 |
+
+*Road to The Windrise Peaks:* Unlike the earlier journeys' eyeballed art placement, these derive directly from the hand-drawn map's pixel space — `positionX = x / 1190`, `positionY = y / 896` against the 1190×896 source bounds — and are what `SeedData` ships.
+
+| Order | Waypoint | positionX | positionY |
+|---|---|---|---|
+| 0 | Wavecrest | 0.0740 | 0.3371 |
+| 1 | Millhollow | 0.1412 | 0.3973 |
+| 2 | Sable Ford | 0.1647 | 0.4375 |
+| 3 | Hallowmere | 0.4437 | 0.5446 |
+| 4 | Oxbow Crossing | 0.4681 | 0.8359 |
+| 5 | Thistlewood | 0.6370 | 0.7567 |
+| 6 | Farrow's Rest | 0.7244 | 0.8292 |
+| 7 | Stonewash Ford | 0.8748 | 0.6217 |
+| 8 | Rivergate | 0.9160 | 0.5804 |
+| 9 | The Windrise Peaks | 0.9118 | 0.0469 |
 
 *Around the World* (real-world, no waypoints) is the "journey with no waypoints" case the map must degrade gracefully against.
 
@@ -253,9 +287,9 @@ Waypoints are **template content** (KAN-10) — shared by every instance, carryi
 
 **Out of scope for KAN-14:** backfilling historical crossings; year-rollup or richer duration phrasing; charts/graphs/trend lines; the trophy case; per-waypoint milestone notifications; km/locale unit switching (still deferred); steps-as-a-stat; real-world MapKit journey stats; any visual design (Jeff owns both screens' layout, mocked at Gate 2).
 
-## The fantasy map: faceted cartography system (epic KAN-16 — Decided, phased P1–P4)
+## The fantasy map: faceted cartography system (epic KAN-16 — P1–P3 built, P4 in progress via KAN-21)
 
-The fantasy-journey map is the app's signature surface. **KAN-7 already shipped a first, real version of it** (see the "Fantasy map + marker" row and "What's actually built today"): a parchment field with a dot-dash ink route, teardrop `WaypointPin`s, and Wren interpolated along the waypoint polyline by real distance. That map is deliberately simple — a handful of SwiftUI pin views over a procedural background, positioned by normalized 0…1 coordinates. The **faceted cartography system** described here is the *next* layer: the textured, faceted **terrain** the map is meant to have, the data it's authored from, the coordinate space it lives in, and a camera that can move over it. **None of this layer is built** — it is epic KAN-16, Decided and phased P1–P4.
+The fantasy-journey map is the app's signature surface. **KAN-7 already shipped a first, real version of it** (see the "Fantasy map + marker" row and "What's actually built today"): a parchment field with a dot-dash ink route, teardrop waypoint pins, and Wren interpolated along the waypoint polyline by real distance. As originally shipped that map was deliberately simple — a handful of SwiftUI pin views (a `WaypointPin` type) over a procedural background, positioned by normalized 0…1 coordinates. (That `WaypointPin` view type is now deleted: KAN-21 renders pins on **every** surface — the faceted map and the pin-and-route fallback alike — in a `Canvas` via `TerrainRenderer.drawPins`, per the shared §07.8 terrain-pin anatomy in `docs/DESIGN_SYSTEM.md`.) The **faceted cartography system** described here is the *next* layer: the textured, faceted **terrain** the map is meant to have, the data it's authored from, the coordinate space it lives in, and a camera that can move over it. **P1–P3 of this layer are now built** — the seeded generator, `MapValidator`, the single-pass `Canvas` `TerrainRenderer`, and the camera/LOD — but wired only into `DebugView`, not yet into any user-facing screen. **P4 (KAN-21) is in progress**: wiring that renderer into the user-facing journey view. It is epic KAN-16, phased P1–P4.
 
 The **visual** style of the terrain — facet recipes, color triads, glyph sizes, the fixed back-to-front draw order — lives in `docs/DESIGN_SYSTEM.md`'s terrain & cartography section (Jeff owns it, and is porting it in parallel). This section owns the **behavior, data, and architecture** underneath that style: how a map is authored, what coordinate space it lives in, how it's drawn, and how the camera moves. Where the two meet they cross-reference; neither restates the other.
 
@@ -330,7 +364,7 @@ Region extents are authored and validated in real miles (converted to map units 
 
 Hundreds of glyphs cannot each be a SwiftUI `View` — layout and diffing would collapse. The terrain is one `Canvas` that draws the generated glyphs in the design system's fixed back-to-front order, culling anything outside the current visible rect. Terrain is fully **static** — it does not animate and does not change once generated; only the marker and the camera move. So the generated glyph set is produced once per map (per LOD bucket) and redrawn cheaply.
 
-- *Trap:* a `ZStack`/`ForEach` of glyph views, or animating the terrain. (KAN-7's ~8 `WaypointPin`s as SwiftUI views are fine at that count and stay as an overlay above the terrain; the *terrain's* hundreds of glyphs are what must not become a view hierarchy.)
+- *Trap:* a `ZStack`/`ForEach` of glyph views, or animating the terrain. (KAN-7 originally drew its ~8 waypoint pins as SwiftUI `WaypointPin` views over the terrain — fine at that count. KAN-21 deleted that type: pins on **every** surface, the pin-and-route fallback included, now draw in the `Canvas` via `TerrainRenderer.drawPins` per the shared §07.8 terrain-pin anatomy. So the *terrain's* hundreds of glyphs are what must not become a view hierarchy — and the pins are no longer one either.)
 - *Mitigation:* one culled `Canvas` pass for terrain; all motion lives in the marker and the camera.
 
 **Decided (amended 2026-07-12 by Justin): two surfaces — a STATIC journey view, and a gesture-driven FULL-SCREEN map. Gestures, LOD, and the overview toggle live only on the full-screen surface.**
@@ -355,7 +389,9 @@ This reinforces the Journey types row — and, unlike the other decisions here, 
 - **P1** — a hand-placed `Canvas` specimen that proves the faceted look (one screen, static, no generator). Validates the aesthetic cheaply before building machinery. Hand-placement here is a deliberate one-off proof, not the authoring model.
 - **P2** — the seeded generator plus a **persistent** tuning harness: an authoring tool with live knobs for density, jitter, feather, and seed. The harness stays in the repo as the map-authoring surface; it is *not* throwaway like a `Mockups/` variant.
 - **P3** — camera, LOD, and performance: UIScrollView-backed zoom/pan, chapter-view framing, density-thinning LOD, `Canvas` culling.
-- **P4** — the real Ember Spire map, authored as regions + seed, replacing KAN-7's pin-and-route `JourneyMapView` surface: fantasy-journey waypoints move from normalized 0…1 to map units, positioned through the camera transform, with the terrain `Canvas` beneath the (unchanged, distance-driven) marker and pins.
+- **P4 (in progress — KAN-21 on `feature/kan-21-journey-view`)** — wire the built faceted renderer (P1–P3: generator, `MapValidator`, `Canvas` `TerrainRenderer`, camera/LOD, all exercised in `DebugView` today) into the **user-facing journey view**, with **Road to The Windrise Peaks (KAN-23) as the vehicle** — the wholly-original, hand-drawn journey whose region+seed authoring already ships in `WindrisePeaksMap`. Per the two-surface decision above: the in-tab **journey view** renders a **static, chapter-framed** terrain surface with an **expand button** onto the gesture-driven **full-screen map**. The marker rides the authored `trekPath` by real `distanceAccumulated` (via `MarkerPositionCalculator`'s map-unit successor — the distance math is unchanged, per "the map reads progress"); **runtime waypoint states (reached / next / upcoming / completed, derived live from progress) override any authored preview states**; a fantasy journey's waypoints move from normalized 0…1 to map units through the camera transform, with the terrain `Canvas` beneath the unchanged marker and pins.
+  - **The template→authoring lookup is the bundled-content seam.** A journey view resolves its template to its map authoring here; **keyed by template *name* today** (as `DebugView` hardcodes `WindrisePeaksMap.make()`), moving to **shipped JSON** later (see "Map authoring data"). A journey **without** map authoring — the catalog's other templates today — **keeps the KAN-7 pin-and-route rendering**, which is now the **documented fallback**, not dead code: the two surfaces coexist, selected by whether authoring exists for that template.
+  - **Ember Spire's map authoring is deferred.** The old plan to author "the real Ember Spire map" as P4 is replaced by the above. Ember Spire's own faceted map waits on the **KAN-25 identity rethink** (its narrative shape sits close to well-known fictional territory); when its identity resettles, its map is authored through the proven **KAN-23 hand-drawn pipeline** — Justin draws the world, the coordinator digitizes it to regions + seed — not through this wiring step. Until then Ember Spire renders via the KAN-7 pin-and-route fallback like any unauthored journey.
 
 **Naming.** The design session's sample map used a placeholder proper noun lifted from a well-known source; it must **never** ship. All map content uses original names — see the naming section (Ember Spire, Thistledown, Crosswater, and the rest).
 
@@ -370,7 +406,7 @@ This reinforces the Journey types row — and, unlike the other decisions here, 
 | **Multiple journeys** | Built (KAN-6); split Built (KAN-10, PR #6) | User runs more than one journey, switches between them, keeps a history of completed ones | "There is only one journey, ever" (a singleton); *and* conflating catalog content with a user's run of it | Model as a list. KAN-10 splits this into `JourneyTemplate` (catalog) + `UserJourney` (instance) and replaces `isActive`/`isCompleted` with the `JourneyStatus` enum — see "Journey lifecycle & the catalog/instance split". |
 | **Multiple simultaneous journeys** | Built (KAN-6) | Yes — a user can run several journeys at once (e.g. Ember Spire and Around the World together) | Assuming only one journey can ever be "active" at a time | The delta-based update above: one shared "last processed distance" anchor, applied to every active journey's own accumulated total. |
 | **Fantasy map + marker** | Built (KAN-7; §04 rig marker KAN-9) | Real-world MapKit routes later | "Progress = marker position" baked into progress logic | Map screen *reads* `journey.progress` / waypoint distances and interpolates marker position; it never owns or writes progress. Faceted terrain rendering is a separate Decided layer — see next row. |
-| **Fantasy map rendering (faceted terrain)** | Decided (epic KAN-16, P1–P4) | The signature faceted terrain; zoom/pan; more journeys later | Hand-placing glyphs; fractional-of-screen coordinates for a map larger than the screen; a per-glyph SwiftUI view hierarchy for hundreds of terrain glyphs | Author as region records + a deterministic seed; one logical map-unit space + a single camera transform; a single culled SwiftUI `Canvas` pass for terrain. Builds *around* KAN-7's already-correct distance-driven marker (row above), which it preserves. See "The fantasy map: faceted cartography system". |
+| **Fantasy map rendering (faceted terrain)** | P1–P3 built (KAN-16); P4 in progress (KAN-21) | The signature faceted terrain; zoom/pan; more journeys later | Hand-placing glyphs; fractional-of-screen coordinates for a map larger than the screen; a per-glyph SwiftUI view hierarchy for hundreds of terrain glyphs | Author as region records + a deterministic seed; one logical map-unit space + a single camera transform; a single culled SwiftUI `Canvas` pass for terrain. Builds *around* KAN-7's already-correct distance-driven marker (row above), which it preserves. See "The fantasy map: faceted cartography system". |
 | **Journey types** | Decided | Fantasy illustrated path today; real-world MapKit routes later | Baking "progress = position on my custom image" into the core progress logic | Keep "distance accumulated" and "how that's visualized" as separate concerns. The map screen reads progress; it doesn't own it. |
 | **Activity data source** | Built (KAN-6) | Cycling, swimming, wheelchair distance, manual entry for offline days | Hardcoding "distance = HealthKit walking/running distance" deep in many places | Wrap HealthKit access in one small "distance provider." Everything else calls that, not HealthKit directly. |
 | **Units** | Built (KAN-6) | Users outside the US expecting km | Hardcoding "miles" into display strings | Store distance in **meters** internally, always. Format for display in one place based on locale. |
@@ -444,7 +480,7 @@ Views read `Image(journey.theme.backgroundImageName)`, `Color(journey.theme.acce
 
 **KAN-14 (built, on `feature/kan-14-journey-stats`; PR pending)** — Journey stats on the card + map, plus the first per-run waypoint-crossing timing. New `WaypointCrossing` model (V3, additive lightweight migration) written by `ProgressUpdater` inside the actor; `completedAt` / `pausedAt` / `accumulatedPausedSeconds` added to `UserJourney`; new `StatFormatter` (dates + durations) and `DistanceFormatter.milesPerDay`; pure `JourneyStatsCalculator`. Forward-only crossings, honest paused/completed freezing. See "Journey stats & waypoint crossings (KAN-14)" above.
 
-**KAN-16 (epic — Decided, not built)** — the faceted cartography system: region authoring + a deterministic seeded scatter generator + a persistent tuning harness, a map-unit coordinate space, a culled single-pass `Canvas` terrain renderer, and a chapter-view camera with density-thinning LOD. Phased P1–P4, each gated on Justin's visual approval. KAN-7's shipped pin-and-route `JourneyMapView` is the surface this extends (its distance-driven marker is preserved unchanged); none of the faceted-terrain layer, the generator, the map-unit space, or the camera exists yet. See "The fantasy map: faceted cartography system" above.
+**KAN-16 (epic — P1–P3 built, P4 in progress)** — the faceted cartography system: region authoring + a deterministic seeded scatter generator + a persistent tuning harness, a map-unit coordinate space, a culled single-pass `Canvas` terrain renderer, and a chapter-view camera with density-thinning LOD. Phased P1–P4, each gated on Justin's visual approval. **P1–P3 are built** — the generator, `MapValidator`, the `Canvas` `TerrainRenderer`, and the camera/LOD, plus the `WindrisePeaksMap` / `SampleJourneyMap` / `EmberSpireScaleFixture` authoring — but wired only into `DebugView` so far. **P4 (KAN-21, on `feature/kan-21-journey-view`, in progress)** wires that renderer into the user-facing journey view with Road to The Windrise Peaks as the vehicle (KAN-23 authoring). Once P4 lands, the faceted surface **supersedes KAN-7's pin-and-route `JourneyMapView` for journeys that have map authoring**, while pin-and-route **remains the documented fallback for journeys without authoring**; the distance-driven marker is preserved unchanged on both surfaces. See "The fantasy map: faceted cartography system" above.
 
 ## What NOT to worry about yet
 
@@ -489,7 +525,7 @@ All properties need inline default values and optional relationships to stay Clo
 - `name`, `descriptionText` (for future notifications)
 - KAN-10: relationship back-reference is `template` (was `journey`)
 
-**Map authoring data** (fantasy journeys only, KAN-16 — the input to the seeded scatter generator; **Decided, not built**)
+**Map authoring data** (fantasy journeys only, KAN-16 — the input to the seeded scatter generator; **the `MapRegion` model + Swift authoring are built (P1–P3), e.g. `WindrisePeaksMap`; bundled-JSON shipping and the template→authoring lookup seam are P4/KAN-21 work in progress**)
 - the journey's map-unit `bounds` (its logical coordinate space), its **miles-per-map-unit scale** (defined by trek-path arc length ↔ journey `totalDistance`, per "The fantasy map"), and a single scatter `seed`
 - an ordered list of **MapRegion** records: `kind` (range / forest / river / lake / coast / groundCover / settlement / road / **trekPath**), a shape spec (blob or ellipse extent; river source→mouth; village site; path polyline) authored and validated in **real miles** and converted to map units through the scale, subject to the canonical size bounds (KAN-18, loosened at the KAN-23 pilot: ranges/hill-chains 15–300 mi long / ≤10 mi wide, forests 0.5–300 sq mi, rivers ≥2 mi, lakes 0.3–60 sq mi, oceans unrestricted), and scatter parameters (density, jitter, feather). A region may be authored partly outside `bounds` (a range running off-map); the range validator checks *total authored* length, and the renderer clips.
 - every **Waypoint** position on a fantasy journey lies on the `trekPath` polyline at its `distanceFromStart` — a P2 authoring validator (KAN-18), not just a convention; this is what keeps the distance-driven marker and the waypoint pins coincident at crossings.

@@ -32,6 +32,7 @@ enum SeedData {
     private static let firstJourneyName = "First Journey"
     private static let aroundTheWorldName = "Around the World"
     private static let lanternRoadName = "The Lantern Road"
+    private static let windrisePeaksName = "Road to The Windrise Peaks"
 
     /// A canonical template definition, seeded idempotently by name.
     private struct TemplateSeed {
@@ -99,6 +100,32 @@ enum SeedData {
                 ("Foglow Bridge",    3,  0.24, 0.76),
                 ("Palefire Hollow",  17, 0.74, 0.26),
                 ("Lanternrest",      20, 0.86, 0.14),
+            ]
+        ),
+        // KAN-23: the first hand-drawn-map journey. The catalog record here drives
+        // "Available Journeys" and the KAN-7 journey screen (normalized 0…1 pin
+        // positions); its faceted map authoring lives in `WindrisePeaksMap`. The ten
+        // waypoint positions are the source-image pixels (1190×896) normalized to the
+        // map bounds — x/1190, y/896. Names are Justin's originals (no real-world IP).
+        TemplateSeed(
+            name: windrisePeaksName,
+            type: .fantasy,
+            totalMiles: 302.4,
+            backgroundImageName: "windrise_peaks_bg",
+            markerImageName: "marker_wren",
+            accentColorToken: "accent/primary",
+            pathColorToken: "ink",
+            waypoints: [
+                ("Wavecrest",           0,     88.0 / 1190, 302.0 / 896),
+                ("Millhollow",          14.2,  168.0 / 1190, 356.0 / 896),
+                ("Sable Ford",          20.9,  196.0 / 1190, 392.0 / 896),
+                ("Hallowmere",          72.9,  528.0 / 1190, 488.0 / 896),
+                ("Oxbow Crossing",      122.6, 557.0 / 1190, 749.0 / 896),
+                ("Thistlewood",         153.9, 758.0 / 1190, 678.0 / 896),
+                ("Farrow's Rest",       172.1, 862.0 / 1190, 743.0 / 896),
+                ("Stonewash Ford",      218.8, 1041.0 / 1190, 557.0 / 896),
+                ("Rivergate",           227.7, 1090.0 / 1190, 520.0 / 896),
+                ("The Windrise Peaks",  302.4, 1085.0 / 1190, 42.0 / 896),
             ]
         ),
         TemplateSeed(
