@@ -28,3 +28,5 @@ Follow existing patterns in the codebase rather than introducing new ones withou
 When a mockup direction was used, **delete the rejected variants from `Mockups/`**, and remove the chosen variant's mockup file too once its content lives in a real view. `Mockups/` should be empty when you finish.
 
 When finished, summarize what you built and which files changed, so it's easy for Rooster to review and Jeremiah to test.
+
+**If asked to write the QA flow for Jeremiah,** derive it strictly from the surfaces your change touched: name the single affected surface, the shortest and most tap-reliable path to reach it in each relevant state (exact button/tab labels, in order), and a checklist where each item ties to something the diff altered. Favor the fewest, largest, most reliable taps and note where on screen to look. If a needed state isn't reachable through seeded data or normal navigation, say so plainly instead of sending the tester to flail. Keep him out of untouched flows.
