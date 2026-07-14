@@ -1,0 +1,232 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 2160" width="1080" height="2160">
+<!--
+  KAN-29 · Cover concept A — "Summit Vista"
+  One-line rationale: the WHOLE JOURNEY is the hero — layered faceted ranges recede
+  to a snow-capped Ember Spire lit by a reward-gold aura, with a dot-dash trek path
+  winding up from the foreground and a tiny Wren already on his way. Title reads as
+  a calm masthead above the vista. Prioritizes SCALE OF THE WORLD over the character.
+
+  Token → hex map used below (static SVG asset; no runtime token binding possible,
+  see docs/DESIGN_SYSTEM.md §02/§07 for the source tokens this traces to):
+    bg/parchment #E8DEC0 · surface/card #F4EEDD · ink #37342B · accent/primary #5B8A4B
+    accent/reward #D6A64B (+ derived tints #E6BE6E / #B3853A)
+    char/cloak #5F6B4D (+ #74815F / #4A543C) · char/skin #D8B58C (+ #E6CBA6 / #BE9A6E)
+    char/hair #8B5A34 (+ #A47245 / #714526)
+    terrain/stone #8C8574 (+ derived #A6A08D / #6E6658, plus a lightened "distant"
+      tint #B7B29D / #C9C4B0 / #9B9683 for the back range, and a darkened "near"
+      tint #6E6656 / #857C69 / #504A3D for the front range — atmospheric-perspective
+      tints of the one terrain/stone hue, same spirit as the §07.3.5 ocean depth
+      bands, not a new material)
+    terrain/snow #EDE8DC (+ #F7F4EC / #D9D2C0) · terrain/forest #3F6B3C (+ #4F7F4B / #2E4F2B)
+    terrain/grass #9CAD5E (flat wash, foreground ground)
+
+  Simplifications for cover scale (documented, not silent): the scatter density in
+  §07.4 (30–50 conifers/forest) is thinned to a legible cluster here; distant-range
+  triangles skip the individual hard offset shadow (the lightened flat tint already
+  reads as "far/hazy") while Ember Spire and the front range keep it per §07.1;
+  the on-path Wren is a simplified small-scale silhouette (cloak + hair + feet),
+  omitting eyes/brows that would be sub-pixel noise at ~90px — full rig lives in
+  WrenMarker.swift for on-screen map use.
+-->
+
+<defs>
+  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#F4EEDD"/>
+    <stop offset="55%" stop-color="#EDE0B8"/>
+    <stop offset="100%" stop-color="#E8C888"/>
+  </linearGradient>
+</defs>
+
+<!-- Sky -->
+<rect x="0" y="0" width="1080" height="1180" fill="url(#sky)"/>
+<!-- Ground base, sits behind the mountains' feet and the foreground mound -->
+<rect x="0" y="1000" width="1080" height="1160" fill="#DCCB9C"/>
+
+<!-- Reward-gold aura behind Ember Spire (flat opacity steps, never a gradient) -->
+<circle cx="540" cy="760" r="270" fill="#D6A64B" opacity="0.14"/>
+<circle cx="540" cy="760" r="205" fill="#D6A64B" opacity="0.22"/>
+<circle cx="540" cy="760" r="145" fill="#D6A64B" opacity="0.32"/>
+<circle cx="540" cy="760" r="90"  fill="#D6A64B" opacity="0.5"/>
+
+<!-- ===================== Back range (distant, lightened tint) ===================== -->
+<g>
+  <!-- p1 -->
+  <path d="M150 850 L280 1010 L20 1010 Z" fill="#C9C4B0"/>
+  <path d="M150 850 L150 1010 L20 1010 Z" fill="#C9C4B0"/>
+  <path d="M150 850 L280 1010 L150 1010 Z" fill="#9B9683"/>
+  <!-- p2 -->
+  <path d="M380 800 L530 1010 L230 1010 Z" fill="#C9C4B0"/>
+  <path d="M380 800 L380 1010 L230 1010 Z" fill="#C9C4B0"/>
+  <path d="M380 800 L530 1010 L380 1010 Z" fill="#9B9683"/>
+  <!-- p3 -->
+  <path d="M650 820 L790 1010 L510 1010 Z" fill="#C9C4B0"/>
+  <path d="M650 820 L650 1010 L510 1010 Z" fill="#C9C4B0"/>
+  <path d="M650 820 L790 1010 L650 1010 Z" fill="#9B9683"/>
+  <!-- p4 -->
+  <path d="M900 850 L1020 1010 L780 1010 Z" fill="#C9C4B0"/>
+  <path d="M900 850 L900 1010 L780 1010 Z" fill="#C9C4B0"/>
+  <path d="M900 850 L1020 1010 L900 1010 Z" fill="#9B9683"/>
+</g>
+
+<!-- ===================== Ember Spire — the destination peak ===================== -->
+<g>
+  <!-- hard offset shadow -->
+  <path d="M552 572 L782 1052 L322 1052 Z" fill="#2E2A22"/>
+  <!-- ridge-split body -->
+  <path d="M540 560 L540 1040 L310 1040 Z" fill="#A6A08D"/>
+  <path d="M540 560 L770 1040 L540 1040 Z" fill="#6E6658"/>
+  <!-- snow cap (~46% of peak width), ridge split -->
+  <path d="M540 560 L540 720 L434 720 Z" fill="#F7F4EC"/>
+  <path d="M540 560 L646 720 L540 720 Z" fill="#D9D2C0"/>
+</g>
+
+<!-- ===================== Mid range (flanking Ember Spire) ===================== -->
+<g>
+  <!-- p1 -->
+  <path d="M112 942 L262 1082 L-38 1082 Z" fill="#7C765F"/>
+  <path d="M100 930 L250 1080 L-50 1080 Z" fill="#A6A08D"/>
+  <path d="M100 930 L100 1080 L-50 1080 Z" fill="#A6A08D"/>
+  <path d="M100 930 L250 1080 L100 1080 Z" fill="#6E6658"/>
+  <!-- p2 -->
+  <path d="M312 782 L472 1092 L152 1092 Z" fill="#7C765F"/>
+  <path d="M300 770 L460 1080 L140 1080 Z" fill="#A6A08D"/>
+  <path d="M300 770 L300 1080 L140 1080 Z" fill="#A6A08D"/>
+  <path d="M300 770 L460 1080 L300 1080 Z" fill="#6E6658"/>
+  <!-- p3 -->
+  <path d="M772 802 L922 1092 L622 1092 Z" fill="#7C765F"/>
+  <path d="M760 790 L910 1080 L610 1080 Z" fill="#A6A08D"/>
+  <path d="M760 790 L760 1080 L610 1080 Z" fill="#A6A08D"/>
+  <path d="M760 790 L910 1080 L760 1080 Z" fill="#6E6658"/>
+  <!-- p4 -->
+  <path d="M942 942 L1092 1082 L792 1082 Z" fill="#7C765F"/>
+  <path d="M930 930 L1080 1080 L780 1080 Z" fill="#A6A08D"/>
+  <path d="M930 930 L930 1080 L780 1080 Z" fill="#A6A08D"/>
+  <path d="M930 930 L1080 1080 L930 1080 Z" fill="#6E6658"/>
+</g>
+
+<!-- ===================== Front range (near, darker) — left cluster ===================== -->
+<g>
+  <path d="M72 552 L262 912 L-118 912 Z" fill="#2E2A22"/>
+  <path d="M60 540 L250 900 L-130 900 Z" fill="#857C69"/>
+  <path d="M60 540 L60 900 L-130 900 Z" fill="#857C69"/>
+  <path d="M60 540 L250 900 L60 900 Z" fill="#504A3D"/>
+
+  <path d="M242 502 L462 942 L2 942 Z" fill="#2E2A22"/>
+  <path d="M230 490 L450 930 L-10 930 Z" fill="#857C69"/>
+  <path d="M230 490 L230 930 L-10 930 Z" fill="#857C69"/>
+  <path d="M230 490 L450 930 L230 930 Z" fill="#504A3D"/>
+
+  <path d="M412 632 L582 942 L242 942 Z" fill="#2E2A22"/>
+  <path d="M400 620 L570 930 L230 930 Z" fill="#857C69"/>
+  <path d="M400 620 L400 930 L230 930 Z" fill="#857C69"/>
+  <path d="M400 620 L570 930 L400 930 Z" fill="#504A3D"/>
+</g>
+
+<!-- ===================== Front range (near, darker) — right cluster ===================== -->
+<g>
+  <path d="M712 632 L882 942 L542 942 Z" fill="#2E2A22"/>
+  <path d="M700 620 L870 930 L530 930 Z" fill="#857C69"/>
+  <path d="M700 620 L700 930 L530 930 Z" fill="#857C69"/>
+  <path d="M700 620 L870 930 L700 930 Z" fill="#504A3D"/>
+
+  <path d="M862 502 L1082 942 L622 942 Z" fill="#2E2A22"/>
+  <path d="M850 490 L1070 930 L610 930 Z" fill="#857C69"/>
+  <path d="M850 490 L850 930 L610 930 Z" fill="#857C69"/>
+  <path d="M850 490 L1070 930 L850 930 Z" fill="#504A3D"/>
+
+  <path d="M1032 552 L1082 912 L782 912 Z" fill="#2E2A22"/>
+  <path d="M1020 540 L1082 900 L770 900 Z" fill="#857C69"/>
+  <path d="M1020 540 L1020 900 L770 900 Z" fill="#857C69"/>
+  <path d="M1020 540 L1082 900 L1020 900 Z" fill="#504A3D"/>
+</g>
+
+<!-- Conifer clusters at the front range's feet (thinned scatter, per header note) -->
+<g fill="#3F6B3C">
+  <!-- helper pattern per conifer: trunk (ink-brown) + ridge-split canopy triangle -->
+  <g transform="translate(120,905)"><rect x="-2" y="10" width="4" height="14" fill="#2E4F2B"/><path d="M0 -18 L14 20 L0 20 Z" fill="#4F7F4B"/><path d="M0 -18 L-14 20 L0 20 Z" fill="#2E4F2B"/></g>
+  <g transform="translate(160,915) scale(0.8)"><rect x="-2" y="10" width="4" height="14" fill="#2E4F2B"/><path d="M0 -18 L14 20 L0 20 Z" fill="#4F7F4B"/><path d="M0 -18 L-14 20 L0 20 Z" fill="#2E4F2B"/></g>
+  <g transform="translate(205,900) scale(1.1)"><rect x="-2" y="10" width="4" height="14" fill="#2E4F2B"/><path d="M0 -18 L14 20 L0 20 Z" fill="#4F7F4B"/><path d="M0 -18 L-14 20 L0 20 Z" fill="#2E4F2B"/></g>
+  <g transform="translate(255,920) scale(0.9)"><rect x="-2" y="10" width="4" height="14" fill="#2E4F2B"/><path d="M0 -18 L14 20 L0 20 Z" fill="#4F7F4B"/><path d="M0 -18 L-14 20 L0 20 Z" fill="#2E4F2B"/></g>
+  <g transform="translate(310,905)"><rect x="-2" y="10" width="4" height="14" fill="#2E4F2B"/><path d="M0 -18 L14 20 L0 20 Z" fill="#4F7F4B"/><path d="M0 -18 L-14 20 L0 20 Z" fill="#2E4F2B"/></g>
+  <g transform="translate(360,918) scale(0.85)"><rect x="-2" y="10" width="4" height="14" fill="#2E4F2B"/><path d="M0 -18 L14 20 L0 20 Z" fill="#4F7F4B"/><path d="M0 -18 L-14 20 L0 20 Z" fill="#2E4F2B"/></g>
+
+  <g transform="translate(725,918) scale(0.85)"><rect x="-2" y="10" width="4" height="14" fill="#2E4F2B"/><path d="M0 -18 L14 20 L0 20 Z" fill="#4F7F4B"/><path d="M0 -18 L-14 20 L0 20 Z" fill="#2E4F2B"/></g>
+  <g transform="translate(775,905)"><rect x="-2" y="10" width="4" height="14" fill="#2E4F2B"/><path d="M0 -18 L14 20 L0 20 Z" fill="#4F7F4B"/><path d="M0 -18 L-14 20 L0 20 Z" fill="#2E4F2B"/></g>
+  <g transform="translate(825,920) scale(0.9)"><rect x="-2" y="10" width="4" height="14" fill="#2E4F2B"/><path d="M0 -18 L14 20 L0 20 Z" fill="#4F7F4B"/><path d="M0 -18 L-14 20 L0 20 Z" fill="#2E4F2B"/></g>
+  <g transform="translate(875,900) scale(1.1)"><rect x="-2" y="10" width="4" height="14" fill="#2E4F2B"/><path d="M0 -18 L14 20 L0 20 Z" fill="#4F7F4B"/><path d="M0 -18 L-14 20 L0 20 Z" fill="#2E4F2B"/></g>
+  <g transform="translate(920,915) scale(0.8)"><rect x="-2" y="10" width="4" height="14" fill="#2E4F2B"/><path d="M0 -18 L14 20 L0 20 Z" fill="#4F7F4B"/><path d="M0 -18 L-14 20 L0 20 Z" fill="#2E4F2B"/></g>
+  <g transform="translate(960,905)"><rect x="-2" y="10" width="4" height="14" fill="#2E4F2B"/><path d="M0 -18 L14 20 L0 20 Z" fill="#4F7F4B"/><path d="M0 -18 L-14 20 L0 20 Z" fill="#2E4F2B"/></g>
+</g>
+
+<!-- Destination pin at Ember Spire's base — §07.8 anatomy, "Next" state:
+     solid accent/primary fill (journey.theme.accentColorToken placeholder for the
+     flagship journey), ink stroke, card-colored center dot, reward emphasis ring,
+     Cinzel-register chip that always shows for the destination. -->
+<g>
+  <circle cx="540" cy="1000" r="34" fill="none" stroke="#D6A64B" stroke-width="6"/>
+  <path d="M540 1050 C 540 1050 508 1020 508 998 A32 32 0 1 1 572 998 C 572 1020 540 1050 540 1050 Z"
+        fill="#37342B" transform="translate(4,5)"/>
+  <path d="M540 1050 C 540 1050 508 1020 508 998 A32 32 0 1 1 572 998 C 572 1020 540 1050 540 1050 Z"
+        fill="#5B8A4B" stroke="#37342B" stroke-width="3"/>
+  <circle cx="540" cy="1000" r="7" fill="#F4EEDD"/>
+  <rect x="466" y="908" width="148" height="46" rx="7" fill="#F4EEDD" stroke="#37342B" stroke-width="2"/>
+  <text x="540" y="937" font-family="Georgia, 'Times New Roman', serif" font-weight="700"
+        font-size="22" fill="#37342B" text-anchor="middle" letter-spacing="0.5">EMBER SPIRE</text>
+</g>
+
+<!-- Foreground mound (nearest ground, where the trail begins) -->
+<path d="M-40 2160 L-40 1560 C 180 1470 380 1620 540 1560 C 700 1500 900 1440 1120 1540 L1120 2160 Z"
+      fill="#9CAD5E" opacity="0.55"/>
+<path d="M-40 2160 L-40 1680 C 220 1610 420 1740 540 1690 C 680 1630 880 1600 1120 1680 L1120 2160 Z"
+      fill="#DCCB9C"/>
+
+<!-- Foreground conifer texture -->
+<g>
+  <g transform="translate(180,1640) scale(1.3)"><rect x="-2" y="10" width="4" height="16" fill="#2E4F2B"/><path d="M0 -20 L16 22 L0 22 Z" fill="#4F7F4B"/><path d="M0 -20 L-16 22 L0 22 Z" fill="#2E4F2B"/></g>
+  <g transform="translate(240,1670) scale(1.1)"><rect x="-2" y="10" width="4" height="16" fill="#2E4F2B"/><path d="M0 -20 L16 22 L0 22 Z" fill="#4F7F4B"/><path d="M0 -20 L-16 22 L0 22 Z" fill="#2E4F2B"/></g>
+  <g transform="translate(850,1650) scale(1.2)"><rect x="-2" y="10" width="4" height="16" fill="#2E4F2B"/><path d="M0 -20 L16 22 L0 22 Z" fill="#4F7F4B"/><path d="M0 -20 L-16 22 L0 22 Z" fill="#2E4F2B"/></g>
+  <g transform="translate(900,1690) scale(1.0)"><rect x="-2" y="10" width="4" height="16" fill="#2E4F2B"/><path d="M0 -20 L16 22 L0 22 Z" fill="#4F7F4B"/><path d="M0 -20 L-16 22 L0 22 Z" fill="#2E4F2B"/></g>
+</g>
+
+<!-- Trek path: dot-dash ink stroke winding from the foreground up to Ember Spire's
+     base, per §06/§07.3.7 (StrokeStyle lineWidth 3, dash [8,6], round caps). -->
+<path d="M540 2020 C 480 1900 610 1820 560 1720 C 510 1630 470 1560 545 1470
+         C 615 1390 500 1300 530 1220 C 555 1150 505 1090 535 1052"
+      fill="none" stroke="#37342B" stroke-width="3" stroke-linecap="round"
+      stroke-dasharray="8 6"/>
+
+<!-- Tiny Wren, already on the path (simplified small-scale silhouette) -->
+<g transform="translate(575,1660)">
+  <ellipse cx="0" cy="72" rx="26" ry="7" fill="#37342B" opacity="0.18"/>
+  <!-- staff -->
+  <line x1="20" y1="-8" x2="20" y2="66" stroke="#5F6B4D" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="20" cy="-10" r="5" fill="#5F6B4D"/>
+  <!-- feet -->
+  <rect x="-14" y="58" width="11" height="16" rx="5" fill="#D8B58C"/>
+  <rect x="3" y="58" width="11" height="16" rx="5" fill="#D8B58C"/>
+  <!-- pack -->
+  <rect x="-16" y="6" width="14" height="18" rx="6" fill="#4A543C"/>
+  <!-- cloak body -->
+  <rect x="-15" y="10" width="32" height="50" rx="13" fill="#5F6B4D"/>
+  <path d="M-15 10 L17 10 L17 24 L-15 34 Z" fill="#74815F"/>
+  <path d="M17 60 L-15 60 L-15 46 L17 34 Z" fill="#4A543C"/>
+  <!-- head + hair -->
+  <circle cx="1" cy="-2" r="13" fill="#D8B58C"/>
+  <g fill="#8B5A34">
+    <circle cx="1" cy="-13" r="6"/>
+    <circle cx="-7" cy="-11" r="5"/>
+    <circle cx="9" cy="-11" r="5"/>
+    <circle cx="-3" cy="-9" r="4.5"/>
+    <circle cx="5" cy="-9" r="4.5"/>
+  </g>
+</g>
+
+<!-- ===================== Masthead ===================== -->
+<line x1="170" y1="255" x2="378" y2="255" stroke="#37342B" stroke-width="3" stroke-linecap="round" stroke-dasharray="8 6"/>
+<line x1="702" y1="255" x2="910" y2="255" stroke="#37342B" stroke-width="3" stroke-linecap="round" stroke-dasharray="8 6"/>
+<text x="540" y="272" font-family="Georgia, 'Times New Roman', serif" font-weight="700"
+      font-size="104" fill="#37342B" text-anchor="middle">JourneyTracker</text>
+<text x="540" y="332" font-family="system-ui, sans-serif" font-weight="600" font-size="30"
+      fill="#8C6A2E" text-anchor="middle" letter-spacing="0.5">Every mile carries you nearer the Spire</text>
+
+</svg>

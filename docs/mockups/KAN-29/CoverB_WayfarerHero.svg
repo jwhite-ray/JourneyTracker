@@ -1,0 +1,173 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 2160" width="1080" height="2160">
+<!--
+  KAN-29 · Cover concept B — "Wayfarer Hero"
+  One-line rationale: WREN HIMSELF is the hero — a large, accurate rendering of the
+  shipped §04/WrenMarker rig fills the lower two-thirds, gazing up toward a smaller
+  Ember Spire glimpsed over his shoulder. Prioritizes CHARACTER RECOGNITION over
+  world scale — the opposite tradeoff from Cover A.
+
+  Token → hex map (see docs/DESIGN_SYSTEM.md §02/§04; static SVG can't bind
+  runtime tokens, hex values traced 1:1 to the named tokens below):
+    bg/parchment #E8DEC0 · surface/card #F4EEDD · ink #37342B · accent/reward #D6A64B
+    char/cloak #5F6B4D (+ #74815F / #4A543C) · char/skin #D8B58C (+ #E6CBA6 / #BE9A6E)
+    char/hair #8B5A34 (+ #A47245 / #714526)
+    terrain/stone #8C8574 (+ #A6A08D / #6E6658, lightened "distant" tint #B7B29D family)
+    terrain/snow #EDE8DC (+ #F7F4EC / #D9D2C0) · terrain/grass #9CAD5E
+
+  Rig fidelity note: geometry below is the shipped WrenMarker.swift construction
+  order and 180×216 fixed-proportion box (§04), hand-scaled ~3.11× and placed —
+  same eye/eyebrow/hair/cloak anatomy, not a redrawn character. One deliberate
+  deviation from the on-map marker: this is a static standing pose (no mid-stride
+  lean), since a cover asset benefits from a calm, symmetrical "arrival is coming"
+  read rather than the walking marker's 6° lean — the calm/walking brow, gaze-up
+  pupils, and thin lower lid are kept, just without the body-level rotation.
+-->
+
+<defs>
+  <linearGradient id="skyB" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0%" stop-color="#F4EEDD"/>
+    <stop offset="60%" stop-color="#EDE0B8"/>
+    <stop offset="100%" stop-color="#E4C57E"/>
+  </linearGradient>
+  <clipPath id="eyeClipL"><circle cx="502.7" cy="1508.0" r="24.9"/></clipPath>
+  <clipPath id="eyeClipR"><circle cx="577.3" cy="1508.0" r="24.9"/></clipPath>
+</defs>
+
+<rect x="0" y="0" width="1080" height="1300" fill="url(#skyB)"/>
+<rect x="0" y="1150" width="1080" height="1010" fill="#DCCB9C"/>
+
+<!-- Reward-gold aura behind the distant Ember Spire -->
+<circle cx="880" cy="760" r="220" fill="#D6A64B" opacity="0.14"/>
+<circle cx="880" cy="760" r="165" fill="#D6A64B" opacity="0.24"/>
+<circle cx="880" cy="760" r="110" fill="#D6A64B" opacity="0.4"/>
+
+<!-- Back range, either side of the peak -->
+<g>
+  <path d="M120 900 L280 1060 L-40 1060 Z" fill="#C9C4B0"/>
+  <path d="M120 900 L120 1060 L-40 1060 Z" fill="#C9C4B0"/>
+  <path d="M120 900 L280 1060 L120 1060 Z" fill="#9B9683"/>
+
+  <path d="M340 860 L470 1060 L210 1060 Z" fill="#B7B29D"/>
+  <path d="M340 860 L340 1060 L210 1060 Z" fill="#B7B29D"/>
+  <path d="M340 860 L470 1060 L340 1060 Z" fill="#9B9683"/>
+</g>
+
+<!-- Ember Spire, glimpsed over Wren's shoulder -->
+<g>
+  <path d="M896 692 L1052 1082 L732 1082 Z" fill="#2E2A22"/>
+  <path d="M880 680 L1040 1070 L720 1070 Z" fill="#A6A08D"/>
+  <path d="M880 680 L880 1070 L720 1070 Z" fill="#A6A08D"/>
+  <path d="M880 680 L1040 1070 L880 1070 Z" fill="#6E6658"/>
+  <path d="M880 680 L880 800 L806 800 Z" fill="#F7F4EC"/>
+  <path d="M880 680 L954 800 L880 800 Z" fill="#D9D2C0"/>
+</g>
+
+<!-- Trek path threading past Wren's feet up toward the peak -->
+<path d="M400 2040 C 470 1930 430 1840 500 1780 C 590 1720 680 1500 800 1300
+         C 860 1180 870 1090 880 1075"
+      fill="none" stroke="#37342B" stroke-width="3" stroke-linecap="round"
+      stroke-dasharray="8 6"/>
+
+<!-- Foreground ground band -->
+<path d="M-40 2160 L-40 1780 C 260 1700 460 1820 540 1780 C 680 1720 880 1700 1120 1790 L1120 2160 Z"
+      fill="#9CAD5E" opacity="0.4"/>
+
+<!-- ===================== Masthead ===================== -->
+<line x1="170" y1="230" x2="378" y2="230" stroke="#37342B" stroke-width="3" stroke-linecap="round" stroke-dasharray="8 6"/>
+<line x1="702" y1="230" x2="910" y2="230" stroke="#37342B" stroke-width="3" stroke-linecap="round" stroke-dasharray="8 6"/>
+<text x="540" y="247" font-family="Georgia, 'Times New Roman', serif" font-weight="700"
+      font-size="98" fill="#37342B" text-anchor="middle">JourneyTracker</text>
+<text x="540" y="305" font-family="system-ui, sans-serif" font-weight="600" font-size="28"
+      fill="#8C6A2E" text-anchor="middle" letter-spacing="0.5">One wayfarer. One long road. Every step counts.</text>
+
+<!-- ===================== Wren, at hero scale ===================== -->
+<g>
+  <!-- ground contact shadow -->
+  <ellipse cx="540" cy="1850.2" rx="115.1" ry="28" fill="#37342B" opacity="0.18"/>
+
+  <!-- 1 · feet -->
+  <g>
+    <rect x="459.1" y="1738.2" width="74.7" height="118.2" rx="34.2" fill="#D8B58C"/>
+    <path d="M459.1 1738.2 L533.8 1738.2 L533.8 1783 L459.1 1808 Z" fill="#E6CBA6"/>
+    <path d="M533.8 1856.4 L459.1 1856.4 L459.1 1815 L533.8 1793 Z" fill="#BE9A6E"/>
+    <rect x="546.2" y="1738.2" width="74.7" height="118.2" rx="34.2" fill="#D8B58C"/>
+    <path d="M546.2 1738.2 L620.9 1738.2 L620.9 1783 L546.2 1808 Z" fill="#E6CBA6"/>
+    <path d="M620.9 1856.4 L546.2 1856.4 L546.2 1815 L620.9 1793 Z" fill="#BE9A6E"/>
+  </g>
+
+  <!-- 2 · back arm -->
+  <g transform="rotate(8 409.3 1626.2)">
+    <rect x="368.9" y="1539.1" width="80.9" height="174.2" rx="40.4" fill="#5F6B4D"/>
+    <path d="M368.9 1539.1 L449.8 1539.1 L449.8 1580 L368.9 1620 Z" fill="#74815F"/>
+    <path d="M449.8 1713.3 L368.9 1713.3 L368.9 1672 L449.8 1632 Z" fill="#4A543C"/>
+  </g>
+
+  <!-- 3 · staff -->
+  <g transform="rotate(-4 667.5 1588.9)">
+    <rect x="655.1" y="1355.5" width="24.9" height="466.7" rx="12.4" fill="#5F6B4D"/>
+  </g>
+  <circle cx="676.9" cy="1364.9" r="23.3" fill="#5F6B4D"/>
+  <path d="M676.9 1341.6 a23.3 23.3 0 0 1 0 46.6 Z" fill="#74815F"/>
+
+  <!-- 4 · pack -->
+  <rect x="381.3" y="1486.2" width="105.8" height="130.7" rx="37.3" fill="#5F6B4D"/>
+  <path d="M381.3 1486.2 L487.1 1486.2 L487.1 1530 L381.3 1560 Z" fill="#74815F"/>
+
+  <!-- 5 · body (cloak) -->
+  <rect x="400" y="1551.5" width="280" height="211.5" rx="62.2" fill="#5F6B4D"/>
+  <path d="M400 1551.5 L680 1551.5 L680 1610 L400 1660 Z" fill="#74815F"/>
+  <path d="M680 1763 L400 1763 L400 1710 L680 1660 Z" fill="#4A543C"/>
+
+  <!-- 6 · belt -->
+  <rect x="400" y="1675.9" width="280" height="24.9" rx="12.4" fill="#37342B"/>
+
+  <!-- 7 · ears -->
+  <circle cx="446.7" cy="1495.5" r="24.9" fill="#D8B58C"/>
+  <circle cx="633.3" cy="1495.5" r="24.9" fill="#D8B58C"/>
+
+  <!-- 8 · face -->
+  <circle cx="540" cy="1483.1" r="93.3" fill="#D8B58C"/>
+  <path d="M540 1389.8 A93.3 93.3 0 0 0 456.4 1518 L540 1483.1 Z" fill="#E6CBA6"/>
+  <path d="M540 1576.4 A93.3 93.3 0 0 0 611.7 1451 L540 1483.1 Z" fill="#BE9A6E"/>
+
+  <!-- 9 · hair (bare curly crown, faceted circles) -->
+  <g>
+    <circle cx="540" cy="1371.1" r="34.2" fill="#8B5A34"/>
+    <circle cx="484" cy="1377.3" r="31.1" fill="#8B5A34"/>
+    <circle cx="596" cy="1377.3" r="31.1" fill="#8B5A34"/>
+    <circle cx="440.4" cy="1408.4" r="29.6" fill="#8B5A34"/>
+    <circle cx="639.6" cy="1408.4" r="29.6" fill="#8B5A34"/>
+    <circle cx="515.1" cy="1402.2" r="28.0" fill="#8B5A34"/>
+    <circle cx="564.9" cy="1402.2" r="28.0" fill="#8B5A34"/>
+    <circle cx="540" cy="1414.7" r="26.4" fill="#8B5A34"/>
+    <circle cx="465.3" cy="1433.3" r="23.3" fill="#8B5A34"/>
+    <circle cx="508.9" cy="1433.3" r="23.3" fill="#8B5A34"/>
+    <circle cx="552.4" cy="1433.3" r="23.3" fill="#8B5A34"/>
+    <circle cx="596" cy="1433.3" r="23.3" fill="#8B5A34"/>
+    <!-- highlight flecks, top-left facet per curl -->
+    <g fill="#A47245" opacity="0.6">
+      <circle cx="530" cy="1362" r="10"/>
+      <circle cx="474" cy="1368" r="9"/>
+      <circle cx="430" cy="1400" r="8"/>
+      <circle cx="505" cy="1394" r="7.5"/>
+    </g>
+  </g>
+
+  <!-- 10 · eyes -->
+  <g clip-path="url(#eyeClipL)">
+    <circle cx="502.7" cy="1508.0" r="24.9" fill="#F4EEDD"/>
+    <circle cx="502.7" cy="1501.8" r="10.9" fill="#37342B"/>
+    <path d="M477.8 1532.9 L477.8 1519.9 Q502.7 1508.5 527.6 1519.9 L527.6 1532.9 Z" fill="#D8B58C"/>
+  </g>
+  <g clip-path="url(#eyeClipR)">
+    <circle cx="577.3" cy="1508.0" r="24.9" fill="#F4EEDD"/>
+    <circle cx="577.3" cy="1501.8" r="10.9" fill="#37342B"/>
+    <path d="M552.4 1532.9 L552.4 1519.9 Q577.3 1508.5 602.2 1519.9 L602.2 1532.9 Z" fill="#D8B58C"/>
+  </g>
+
+  <!-- 11 · eyebrows (calm/walking: soft-raised, gentle) -->
+  <rect x="471.6" y="1462.9" width="62.2" height="15.6" rx="7.8" fill="#37342B" transform="rotate(-6 502.7 1470.7)"/>
+  <rect x="546.2" y="1462.9" width="62.2" height="15.6" rx="7.8" fill="#37342B" transform="rotate(6 577.3 1470.7)"/>
+</g>
+
+</svg>

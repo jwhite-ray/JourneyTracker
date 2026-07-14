@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+<!--
+  JourneyTracker app icon · Direction C — "Peak + Trail"
+  Same Ember Spire as Directions A/B, this time with NO gold aura — instead a
+  bold ink dot-dash trek trail (the same stroke language as §06/§07.3.7, scaled
+  way up and thickened so it survives down to ~40px) switch-backs up the
+  mountain's face to the summit. Leans hardest into "tracking your path" of the
+  three directions.
+
+  Background is a different, deliberately BOLD treatment than A's radiant aura:
+  a flat two-tone horizon — a lighter card-cream sky over a warm taupe ground
+  band (a flat wash of the stone highlight tint, not a new color) — so the peak
+  reads as sitting on mapped ground rather than glowing. No radial aura ties
+  this one back to "cartography" instead of "reward."
+
+  Full-bleed square, no transparency, no rounded corners. All content within the
+  ~80% safe center (x/y 102–922 of 1024).
+
+  Token → hex map (static SVG can't bind runtime tokens):
+    surface/card #F4EEDD (sky) · terrain/stone highlight tint #A6A08D at 0.35
+      opacity over card (ground band — a flat wash, not a new literal)
+    terrain/stone #8C8574 (facet tints #A6A08D / #6E6658, hard-offset-shadow
+      #2E2A22) · terrain/snow #EDE8DC (facet tints #F7F4EC / #D9D2C0)
+    ink #37342B (trail stroke, same token as the map's dot-dash trek path)
+-->
+
+<!-- Background: flat two-tone horizon (sky + ground band), no gradient -->
+<rect x="0" y="0" width="1024" height="1024" fill="#F4EEDD"/>
+<rect x="0" y="620" width="1024" height="404" fill="#A6A08D" opacity="0.35"/>
+
+<!-- Ember Spire: hard offset shadow, then ridge-split body, then snow cap -->
+<path d="M538 310 L870 890 L206 890 Z" fill="#2E2A22"/>
+<path d="M512 280 L180 860 L512 860 Z" fill="#A6A08D"/>
+<path d="M512 280 L512 860 L844 860 Z" fill="#6E6658"/>
+<path d="M512 280 L363 540 L512 540 Z" fill="#F7F4EC"/>
+<path d="M512 280 L512 540 L661 540 Z" fill="#D9D2C0"/>
+
+<!-- Bold dot-dash trek trail, switch-backing from the base to the summit —
+     drawn on top so it reads clearly against both the stone and snow facets -->
+<path d="M460 840
+         C 560 800 600 760 560 720
+         C 520 680 380 700 400 650
+         C 420 600 600 620 580 560
+         C 560 500 400 520 430 460
+         C 460 400 580 420 560 360
+         C 540 320 520 310 508 290"
+      fill="none" stroke="#37342B" stroke-width="34" stroke-linecap="round"
+      stroke-dasharray="78 46"/>
+
+</svg>
