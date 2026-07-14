@@ -24,6 +24,7 @@ enum DesignToken {
     static let alert = "accent/alert"
     static let charCloak = "char/cloak"
     static let charSkin = "char/skin"
+    static let charHair = "char/hair"
 }
 
 extension Color {

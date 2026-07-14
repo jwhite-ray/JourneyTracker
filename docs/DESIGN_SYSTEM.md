@@ -1,4 +1,4 @@
-# JourneyTracker — Design System v1.9
+# JourneyTracker — Design System v1.10
 
 **Status:** living document · owned by Jeff (design) · iOS · SwiftUI
 **Scope:** this document passes **style only** — color, type, shape, layout, the character rig, and the faceted terrain/cartography system. It does not define behavior, data models, units, or progress math. Those live in `docs/JourneyTracker_App_Concept.md`, which wins on any such question.
@@ -24,6 +24,8 @@ Every step you walk carries a wayfarer closer to the summit along the 1,800-mile
 > **v1.8 change log.** Added §07.7 "World-edge border" (Gate 3 ruling, KAN-20): when the camera can see the authored world's edge, its bounds are traced with a visible border line — 3pt ink, matching the map-frame linework in §09 — drawn above terrain and below pins/chips, with the world edge itself ruled **square-cornered** (distinct from the UI map frame's 18pt radius). Outside the line is bare parchment letterbox, no terrain. Former §07.7 "Handoff notes" is renumbered §07.8; nothing in it changed.
 
 > **v1.9 change log.** Ported the KAN-23 organic-detail pass (Justin's "the drawing trumps the rules" pilot-map ruling, App Concept doc) into §07: **(1)** §07.5's river-termination rule is rewritten — a river's source may now rise anywhere on land (an upland spring, partway up a range, or off-canvas), never in water, and it ends in a lake, at the coastline (melting per §07.3.3), or by exiting the map edge as an off-map drainage (drawn full-width to the world border and clipped there, §07.7); the prior wording ("a river always starts off-canvas or in a mountain range, and always ends either in a lake or abruptly at the coastline") is gone, not left alongside the new rule. Mouths still melt (§07.3.3) — an off-map exit is a clean edge-clip, not a melt. **(2)** New organic-detail visual language, purely stylistic (the underlying generator remains Jake's): §07.3.5 coasts gain multi-octave "organic displacement" (coves/headlands plus finer wobble, wander capped at ~2 real miles, pinned to zero at river mouths and shoreside villages, one 0–1 roughness knob); §07.3.3 rivers gain layered meanders (on-canvas drawn length up to ~1.5× the authored line, several true bends) and small tributaries (1.3–3 mi thin side-streams, melting into the main stem at a confluence with the same no-cap mouth recipe as §07.3.3's river mouths); §07.3.7 trek-path and road linework gain a subtle hand-wave (~0.12 mi amplitude, easing to zero at every waypoint) so traced segments never render ruler-straight. **(3)** §07.3.1 notes that short ranges/hill-chains (15–300 mi, the App Concept doc's KAN-23-loosened bound) currently render with the same mountain glyph at lower stature — a dedicated hills glyph stays an open future design option, not shipped here. **(4)** §07.5's "villages sit next to water" is downgraded from a hard placement rule to a design **preference**: the App Concept doc's ≤40-mile settlement cap is a sanity guard against absurd inland distance, not an aesthetic mandate, so a legitimate inland market or road town is not a violation.
+
+> **v1.10 change log.** Ported the finalized KAN-27 Wren redesign into §02 and §04: **(1)** `char/cloak` is retinted Cloak Brown `#7A6A4F` → **Fernwood Moss `#5F6B4D`** (same token, new hue — still the neutral prop tone for cloak, staff, pack, and back arm). **(2)** New character-color token **`char/hair` = `#8B5A34` "Chestnut Curl"**, added to §02, for the curly-hair facets. **(3)** The old pentagon "hood" (it read as a bishop's mitre) is removed from the construction order and fixed proportions; Wren is now bare-headed with a cluster of small faceted circles for curly hair, hugging the crown with a fringe just above the brows, ears still visible at the sides. **(4)** The mid-walk emotional state changes from "Determined" (brows angled in-down) — which read as angry — to a neutral/calm expression: soft-raised brows, gaze directed up-and-forward, forward lean retained. **(5)** A thin skin-tone lower eyelid is added to the eye spec, clipped to the eye circle — the no-mouth hard rule is unaffected, the lid is part of the eye, not a mouth.
 
 ---
 
@@ -52,7 +54,8 @@ Authored in oklch; hex fallbacks given for iOS asset catalogs. **The token name 
 | Reward Gold | `accent/reward` | `#D6A64B` | badges, rewards |
 | Ember Red | `accent/alert` | `#B23A2E` | streak risk, alert |
 | Wayfarer Skin | `char/skin` | `#D8B58C` | faces, ears, feet |
-| Cloak Brown | `char/cloak` | `#7A6A4F` | cloak / neutral prop |
+| Fernwood Moss | `char/cloak` | `#5F6B4D` | cloak / neutral prop (staff, pack, back arm) |
+| Chestnut Curl | `char/hair` | `#8B5A34` | curly-hair facets (KAN-27) |
 | Card Cream | `surface/card` | `#F4EEDD` | card surfaces |
 | Deepdark | `bg/dark` | `#12201A` | dark mode base |
 
@@ -108,9 +111,9 @@ One rig, re-posed and re-skinned. Each body part is a rounded shape holding thre
 
 Default character: **Wren**, a wayfarer of the small-folk.
 
-**Construction order (back → front):** shadow ellipse → feet → back arm → staff → pack → body (cloak) → belt → ears → face circle → hood → eye whites → pupils → eyebrows
+**Construction order (back → front):** shadow ellipse → feet → back arm → staff → pack → body (cloak) → belt → ears → face circle → hair (curly, faceted) → eye whites → pupils → lower eyelids → eyebrows
 
-**Fixed proportions** (on a 180×216 box): head ⌀60 · hood 76×64 pentagon · body 90×68 r20 · arms 26×56 r13 · feet 24×38 · eye white ⌀16, pupil ⌀7. Big feet, no visible hands = the small-folk read.
+**Fixed proportions** (on a 180×216 box): head ⌀60 · body 90×68 r20 · arms 26×56 r13 · feet 24×38 · eye white ⌀16, pupil ⌀7. Big feet, no visible hands = the small-folk read.
 
 **Facet recipe (per shape):**
 1. base = mid tone
@@ -119,15 +122,19 @@ Default character: **Wren**, a wayfarer of the small-folk.
 
 Clip each facet to the parent's rounded silhouette. In SwiftUI: `.clipShape(RoundedRectangle(...))` on a `ZStack`, with each facet a `Path` — the original CSS `clip-path: polygon(0 0, 100% 0, 100% 45%, 0 70%)` becomes a four-point `Path` in the shape's local coordinate space.
 
-**Emotional states — brows + posture only, never a mouth:**
+**Hair (KAN-27).** Wren is bare-headed — no hood, no headwear of any kind. A cluster of small faceted circles in `char/hair`, each carrying the standard three-facet recipe above (base + top-left highlight + bottom-right shadow), hugs the crown of the head circle, with a hairline fringe sitting just above the brows. Ears remain visible at the sides, unobscured. This replaces the old 76×64 pentagon "hood," which read as a bishop's mitre and is gone from the rig entirely — not left as an alternate option.
+
+**Eyes.** Eye white (⌀16) + pupil (⌀7), per the fixed proportions above. A thin skin-tone (`char/skin`) lower eyelid — a shallow curve clipped to the eye white's circle — sits along the eye's lower edge on every state. This is the rig's one warmth cue given the no-mouth rule below; it is part of the eye, not a mouth, and does not relax the hard rule.
+
+**Emotional states — brows + eyelids + posture only, never a mouth:**
 
 | State | Expression |
 |---|---|
-| Determined | brows angled in-down, forward lean |
+| Calm / walking | soft-raised brows (outer edge up, gentle — not angled in-down), gaze directed slightly up and forward (pupils raised), thin lower eyelid, forward lean |
 | Worn out | heavy lids, drooped brows, hunch |
 | Fresh start | raised brows, blush, mid-hop |
 
-State is driven by daily activity: fresh in the morning or after hitting a goal, determined mid-walk, worn out when the streak is at risk or late in the day.
+State is driven by daily activity: fresh in the morning or after hitting a goal, calm/neutral mid-walk, worn out when the streak is at risk or late in the day.
 
 **Ship as a layered vector** — an SVG or SwiftUI shape stack, not a raster — so facet colors and brow/posture states can be swapped at runtime.
 
@@ -292,7 +299,7 @@ Outside the line is bare `bg/parchment` letterbox — no terrain, no fill, nothi
 | Reached / passed | `journey.theme.accentColorToken` | 3pt ink (2pt if a smaller badge) | 100% | Optional small ink checkmark/glyph. |
 | Next (the single upcoming waypoint) | `journey.theme.accentColorToken`, or `accent/reward` for the badge/ring itself | 3pt ink + an `accent/reward` emphasis ring or larger scale | 100% | One of two waypoints whose name label is always shown, not just on tap — the other is the destination (see below). There is ever exactly one "next." |
 | Further unreached | none (outline only) | 2pt ink, dashed | 60% | Same locked language as milestone badges (§08). No name label by default — **except** the destination waypoint, which always shows its chip even while further-unreached (see below). |
-| Completed-journey final waypoint | `accent/reward` | 3pt ink | 100% | Marker (Wren) is parked here, posed "fresh" (raised brows, no forward lean) with an `accent/reward` ring or pixel glyph attached — must read as *stopped*, distinct from mid-route "determined"/"worn out" walking poses. |
+| Completed-journey final waypoint | `accent/reward` | 3pt ink | 100% | Marker (Wren) is parked here, posed "fresh" (raised brows, no forward lean) with an `accent/reward` ring or pixel glyph attached — must read as *stopped*, distinct from mid-route "calm/neutral"/"worn out" walking poses. |
 
 **Destination label rule (Gate 1 ruling, KAN-18).** The journey's destination waypoint — the final one, e.g. Ember Spire — always shows its Cinzel name chip, in every state: reached, next, or further-unreached. This replaces the earlier rule that "next" was the *only* waypoint always labelled; now next **and** the destination both are, and there is no longer a state in which the destination's name is tap-to-reveal. The chip is additive only — it never changes the destination's pin *body*, which still follows its row above exactly like any other waypoint in that state (an unreached destination keeps the dashed-outline, 60%-opacity treatment from the "Further unreached" row; its name chip simply floats above that outline instead of being withheld).
 

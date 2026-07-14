@@ -68,17 +68,19 @@ private struct Faceted<S: Shape>: View {
     }
 }
 
-/// The §04 hood: a 76×64 pentagon (peak up) drawn in its own rect's local space.
-private struct Pentagon: Shape {
+/// A thin lower eyelid, filled in skin and clipped to the eye circle: an arc
+/// rising from the eye's lower corners across the bottom of the iris. Gives the
+/// mid-route "neutral/calm" smize without ever adding a mouth (§01/§04).
+private struct LowerLid: Shape {
     func path(in rect: CGRect) -> Path {
+        let h = rect.height
         var p = Path()
-        p.move(to: CGPoint(x: rect.midX, y: rect.minY))                               // apex
-        p.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + rect.height * 0.62))       // right shoulder
-        p.addLine(to: CGPoint(x: rect.maxX - rect.width * 0.10, y: rect.maxY))        // lower right
-        p.addLine(to: CGPoint(x: rect.minX + rect.width * 0.10, y: rect.maxY))        // lower left
-        p.addLine(to: CGPoint(x: rect.minX, y: rect.minY + rect.height * 0.62))       // left shoulder
-        p.closeSubpath()
-        return p
+        p.move(to: CGPoint(x: rect.minX, y: rect.maxY))
+        p.addLine(to: CGPoint(x: rect.minX, y: rect.minY + h * 0.88))
+        p.addQuadCurve(to: CGPoint(x: rect.maxX, y: rect.minY + h * 0.88),
+                       control: CGPoint(x: rect.midX, y: rect.minY + h * 0.76))
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        p.closeSubpath(); return p
     }
 }
 
@@ -88,7 +90,8 @@ private struct Pentagon: Shape {
 /// on-map marker size. All coordinates below are in the 180×216 box.
 private struct WrenRig: View {
     /// true = parked / completed (fresh: raised brows, no lean, resting).
-    /// false = mid-route (determined: brows angled in-down, forward lean).
+    /// false = mid-route (neutral/calm: soft-raised brows, gaze up-and-forward,
+    /// thin lower lid, forward lean).
     var resting: Bool
 
     // Design box.
@@ -97,6 +100,7 @@ private struct WrenRig: View {
     // Token-derived bases (facets come from these via the §04 helpers).
     private var cloak: Color { Color(token: DesignToken.charCloak) }
     private var skin: Color { Color(token: DesignToken.charSkin) }
+    private var hair: Color { Color(token: DesignToken.charHair) }
     private var ink: Color { Color(token: DesignToken.ink) }
     private var eyeWhite: Color { Color(token: DesignToken.card) }
 
@@ -120,7 +124,7 @@ private struct WrenRig: View {
                     .position(x: 90, y: 104)
             }
 
-            // The character, leaned forward when walking (§04 "determined").
+            // The character, leaned forward when walking (§04 "neutral/calm").
             figure
                 .rotationEffect(.degrees(resting ? 0 : 6), anchor: .bottom)
         }
@@ -128,8 +132,9 @@ private struct WrenRig: View {
     }
 
     /// Construction order (back → front): feet → back arm → staff → pack →
-    /// body (cloak) → belt → ears → face circle → hood → eye whites → pupils →
-    /// eyebrows. (The ground shadow — step 0 of §04 — lives outside the lean.)
+    /// body (cloak) → belt → ears → face circle → hair → eye whites → pupils →
+    /// lower lids → eyebrows. (The ground shadow — step 0 of §04 — lives outside
+    /// the lean.)
     private var figure: some View {
         ZStack {
             // 1 · Feet (big, no visible hands = the small-folk read).
@@ -162,36 +167,64 @@ private struct WrenRig: View {
                 .frame(width: 90, height: 8)
                 .position(x: 90, y: 148)
 
-            // 7 · Ears (skin), at the sides of the head, below the hood rim.
+            // 7 · Ears (skin), at the sides of the head, below the hairline.
             faceted(Circle(), base: skin, w: 16, h: 16, x: 60, y: 86)
             faceted(Circle(), base: skin, w: 16, h: 16, x: 120, y: 86)
 
             // 8 · Face circle (head ⌀60).
             faceted(Circle(), base: skin, w: 60, h: 60, x: 90, y: 82)
 
-            // 9 · Hood (76×64 pentagon), pulled down to the brow.
-            faceted(Pentagon(), base: cloak, w: 76, h: 64, x: 90, y: 38)
+            // 9 · Hair (bare curly crown) — faceted circles hugging the crown
+            //     with a fringe at the hairline, replacing the old hood.
+            hairCurls
 
-            // 10 · Eye whites (⌀16).
-            Circle().fill(eyeWhite).frame(width: 16, height: 16).position(x: 78, y: 90)
-            Circle().fill(eyeWhite).frame(width: 16, height: 16).position(x: 102, y: 90)
+            // 10 · Eyes: each a 16×16 clipped ZStack of {eye-white, pupil ⌀7 ink,
+            //     skin lower lid}. Pupils gaze up-and-forward when walking.
+            let pupilDY: CGFloat = resting ? -1 : -2
+            eye(x: 78, y: 90, pupilDY: pupilDY)
+            eye(x: 102, y: 90, pupilDY: pupilDY)
 
-            // 11 · Pupils (⌀7, ink). Look slightly forward-down when determined.
-            let pupilDY: CGFloat = resting ? -1 : 2
-            Circle().fill(ink).frame(width: 7, height: 7).position(x: 79, y: 90 + pupilDY)
-            Circle().fill(ink).frame(width: 7, height: 7).position(x: 103, y: 90 + pupilDY)
-
-            // 12 · Eyebrows (ink) — emotion lives here, never a mouth (§01/§04).
-            //  Determined: angled in-down (\ /). Fresh: raised (/ \).
+            // 11 · Eyebrows (ink) — emotion lives here, never a mouth (§01/§04).
+            //  Neutral/calm: soft-raised. Fresh: raised, arched out.
             eyebrows
         }
         .frame(width: box.width, height: box.height)
     }
 
+    /// Bare curly hair: faceted circles (base `hair`) hugging the crown with a
+    /// fringe at the hairline, drawn in the same §04 flat-facet language.
+    private var hairCurls: some View {
+        ZStack {
+            faceted(Circle(), base: hair, w: 22, h: 22, x: 90, y: 46)
+            faceted(Circle(), base: hair, w: 20, h: 20, x: 72, y: 48)
+            faceted(Circle(), base: hair, w: 20, h: 20, x: 108, y: 48)
+            faceted(Circle(), base: hair, w: 19, h: 19, x: 58, y: 58)
+            faceted(Circle(), base: hair, w: 19, h: 19, x: 122, y: 58)
+            faceted(Circle(), base: hair, w: 18, h: 18, x: 82, y: 56)
+            faceted(Circle(), base: hair, w: 18, h: 18, x: 98, y: 56)
+            faceted(Circle(), base: hair, w: 17, h: 17, x: 90, y: 60)
+            faceted(Circle(), base: hair, w: 15, h: 15, x: 66, y: 66)
+            faceted(Circle(), base: hair, w: 15, h: 15, x: 80, y: 66)
+            faceted(Circle(), base: hair, w: 15, h: 15, x: 94, y: 66)
+            faceted(Circle(), base: hair, w: 15, h: 15, x: 108, y: 66)
+        }
+    }
+
+    /// One eye: a 16×16 clipped ZStack of eye-white, ink pupil (⌀7, offset by
+    /// `pupilDY`), and a thin skin lower lid, positioned at (x, y) in the box.
+    private func eye(x: CGFloat, y: CGFloat, pupilDY: CGFloat) -> some View {
+        ZStack {
+            Circle().fill(eyeWhite)
+            Circle().fill(ink).frame(width: 7, height: 7).position(x: 8, y: 8 + pupilDY)
+            LowerLid().fill(skin)
+        }
+        .frame(width: 16, height: 16).clipShape(Circle()).position(x: x, y: y)
+    }
+
     private var eyebrows: some View {
-        // Determined: inner ends drop toward the nose. Fresh: raised, arched out.
-        let leftAngle: Double = resting ? -12 : 18
-        let rightAngle: Double = resting ? 12 : -18
+        // Neutral/calm: soft-raised. Fresh: raised, arched out.
+        let leftAngle: Double = resting ? -12 : -6
+        let rightAngle: Double = resting ? 12 : 6
         let browY: CGFloat = resting ? 74 : 78
         return Group {
             Capsule().fill(ink).frame(width: 20, height: 5)
@@ -219,7 +252,7 @@ private struct WrenRig: View {
 
 struct WrenMarker: View {
     /// true = parked / completed (fresh, raised brows); false = walking
-    /// (determined, forward lean). Drives the §04 emotional state.
+    /// (neutral/calm, forward lean). Drives the §04 emotional state.
     var resting: Bool
 
     /// Uniform down-scale of the 180×216 rig to the on-map marker size. Keeps
@@ -237,8 +270,8 @@ struct WrenMarker: View {
 
 #Preview("Wren — poses") {
     HStack(spacing: 40) {
-        WrenMarker(resting: false)   // determined / walking
-        WrenMarker(resting: true)    // fresh / completed
+        WrenMarker(resting: false)   // walking (neutral)
+        WrenMarker(resting: true)    // resting (fresh)
     }
     .scaleEffect(6)
     .padding(120)
