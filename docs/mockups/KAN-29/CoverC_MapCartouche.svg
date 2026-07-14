@@ -1,0 +1,188 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1080 2160" width="1080" height="2160">
+<!--
+  KAN-29 · Cover concept C — "Map Cartouche"
+  One-line rationale: the cover IS the map artifact — a title cartouche plaque set
+  into a §07.7 square-cornered world-edge border, with the trek path, waypoint
+  pins (in three different §07.8 states), a compass rose, and terrain glyphs
+  standing in as the map's own art. Prioritizes BRAND SYSTEM / cartography over
+  either the world's scale (A) or the character (B) — most "product," least "art."
+
+  Token → hex map (see docs/DESIGN_SYSTEM.md §02/§07/§07.8):
+    bg/parchment #E8DEC0 · surface/card #F4EEDD · ink #37342B
+    accent/primary #5B8A4B (Next-pin fill / journey.theme.accentColorToken
+      placeholder) · accent/reward #D6A64B (emphasis ring)
+    terrain/stone #8C8574 (+#A6A08D/#6E6658) · terrain/snow #EDE8DC (+#F7F4EC/#D9D2C0)
+    terrain/forest #3F6B3C (+#4F7F4B/#2E4F2B) · terrain/water #4C7EA6 (+darker
+      #3A6482 bank / lighter #6FA0C4 highlight ribbon, per §07.3.3)
+    terrain/roof #B65C3F
+
+  Waypoint-state showcase (deliberate, not required elsewhere): Thistledown is
+  plain map calligraphy (a place-name label, not a UI chip — a cartography
+  convention distinct from the app's live pin chips); Crosswater is a "further
+  unreached" dashed pin, no chip; Silvergate is "Next" — solid fill, reward ring,
+  chip always shown; Ember Spire is the destination — dashed further-unreached
+  body, chip always shown regardless of state, per §07.8/§08's destination rule.
+  World-edge border is traced exactly at the 120px safe-margin inset (§07.7).
+-->
+
+<defs>
+  <path id="teardrop" d="M540 1050 C540 1050 512 1024 512 1004 A28 28 0 1 1 568 1004 C568 1024 540 1050 540 1050 Z"/>
+</defs>
+
+<rect x="0" y="0" width="1080" height="2160" fill="#E8DEC0"/>
+
+<!-- Aged-parchment mottling (subtle, flat, no blur) -->
+<g fill="#37342B" opacity="0.035">
+  <ellipse cx="180" cy="600" rx="140" ry="90"/>
+  <ellipse cx="900" cy="1000" rx="160" ry="110"/>
+  <ellipse cx="300" cy="1550" rx="120" ry="80"/>
+  <ellipse cx="750" cy="1850" rx="150" ry="95"/>
+</g>
+
+<!-- World-edge border, square-cornered, traced at the safe-margin inset (§07.7) -->
+<rect x="120" y="120" width="840" height="1920" fill="none" stroke="#37342B" stroke-width="3"/>
+<!-- Cartographer's tick marks along the top and bottom edges -->
+<g stroke="#37342B" stroke-width="2">
+  <line x1="200" y1="120" x2="200" y2="134"/><line x1="330" y1="120" x2="330" y2="134"/>
+  <line x1="750" y1="120" x2="750" y2="134"/><line x1="880" y1="120" x2="880" y2="134"/>
+  <line x1="200" y1="2040" x2="200" y2="2026"/><line x1="330" y1="2040" x2="330" y2="2026"/>
+  <line x1="750" y1="2040" x2="750" y2="2026"/><line x1="880" y1="2040" x2="880" y2="2026"/>
+</g>
+
+<!-- ===================== Map art: Ember Spire massif ===================== -->
+<circle cx="540" cy="720" r="140" fill="#D6A64B" opacity="0.14"/>
+<circle cx="540" cy="720" r="100" fill="#D6A64B" opacity="0.24"/>
+<circle cx="540" cy="720" r="65" fill="#D6A64B" opacity="0.4"/>
+
+<g>
+  <path d="M402 656 L532 916 L272 916 Z" fill="#2E2A22"/>
+  <path d="M390 640 L505 900 L275 900 Z" fill="#A6A08D"/>
+  <path d="M390 640 L390 900 L275 900 Z" fill="#A6A08D"/>
+  <path d="M390 640 L505 900 L390 900 Z" fill="#6E6658"/>
+
+  <path d="M712 666 L832 916 L592 916 Z" fill="#2E2A22"/>
+  <path d="M700 650 L820 900 L580 900 Z" fill="#A6A08D"/>
+  <path d="M700 650 L700 900 L580 900 Z" fill="#A6A08D"/>
+  <path d="M700 650 L820 900 L700 900 Z" fill="#6E6658"/>
+
+  <path d="M552 576 L722 916 L372 916 Z" fill="#2E2A22"/>
+  <path d="M540 560 L710 900 L370 900 Z" fill="#A6A08D"/>
+  <path d="M540 560 L540 900 L370 900 Z" fill="#A6A08D"/>
+  <path d="M540 560 L710 900 L540 900 Z" fill="#6E6658"/>
+  <path d="M540 560 L540 680 L462 680 Z" fill="#F7F4EC"/>
+  <path d="M540 560 L618 680 L540 680 Z" fill="#D9D2C0"/>
+</g>
+
+<!-- Conifer texture at the massif's feet -->
+<g>
+  <g transform="translate(320,880) scale(0.9)"><rect x="-2" y="10" width="4" height="14" fill="#2E4F2B"/><path d="M0 -18 L14 20 L0 20 Z" fill="#4F7F4B"/><path d="M0 -18 L-14 20 L0 20 Z" fill="#2E4F2B"/></g>
+  <g transform="translate(360,890) scale(0.75)"><rect x="-2" y="10" width="4" height="14" fill="#2E4F2B"/><path d="M0 -18 L14 20 L0 20 Z" fill="#4F7F4B"/><path d="M0 -18 L-14 20 L0 20 Z" fill="#2E4F2B"/></g>
+  <g transform="translate(650,885) scale(0.85)"><rect x="-2" y="10" width="4" height="14" fill="#2E4F2B"/><path d="M0 -18 L14 20 L0 20 Z" fill="#4F7F4B"/><path d="M0 -18 L-14 20 L0 20 Z" fill="#2E4F2B"/></g>
+  <g transform="translate(700,875)"><rect x="-2" y="10" width="4" height="14" fill="#2E4F2B"/><path d="M0 -18 L14 20 L0 20 Z" fill="#4F7F4B"/><path d="M0 -18 L-14 20 L0 20 Z" fill="#2E4F2B"/></g>
+</g>
+
+<!-- River off the massif, melting into a lake (§07.3.3/§07.3.4) -->
+<path d="M460 840 C 500 940 420 1020 480 1120 C 560 1220 500 1320 620 1400 C 700 1450 730 1460 755 1470"
+      fill="none" stroke="#3A6482" stroke-width="13" stroke-linecap="round"/>
+<path d="M460 840 C 500 940 420 1020 480 1120 C 560 1220 500 1320 620 1400 C 700 1450 730 1460 755 1470"
+      fill="none" stroke="#4C7EA6" stroke-width="9" stroke-linecap="round"/>
+<path d="M456 838 C 494 934 418 1012 474 1108"
+      fill="none" stroke="#6FA0C4" stroke-width="3" stroke-linecap="round"/>
+<path d="M770 1470 C 830 1450 855 1490 830 1530 C 800 1565 735 1555 720 1515 C 710 1488 735 1470 770 1470 Z"
+      fill="#4C7EA6"/>
+<path d="M770 1470 C 830 1450 855 1490 840 1520 C 815 1478 790 1470 770 1470 Z" fill="#6FA0C4"/>
+<path d="M770 1470 C 830 1450 855 1490 830 1530 C 800 1565 735 1555 720 1515 C 710 1488 735 1470 770 1470 Z"
+      fill="none" stroke="#EDE8DC" stroke-width="2.5"/>
+
+<!-- Trek path: Thistledown → Crosswater → Silvergate → Ember Spire -->
+<path d="M260 1960 C 320 1850 340 1780 380 1680 C 430 1550 400 1430 470 1260 C 520 1130 500 970 540 905"
+      fill="none" stroke="#37342B" stroke-width="3" stroke-linecap="round" stroke-dasharray="8 6"/>
+
+<!-- Thistledown: settlement glyph + plain map calligraphy (not a UI chip) -->
+<g>
+  <g transform="translate(230,1935)">
+    <rect x="-9" y="-10" width="18" height="14" fill="#F4EEDD" stroke="#37342B" stroke-width="1.5"/>
+    <path d="M-11 -10 L0 -24 L11 -10 Z" fill="#B65C3F"/>
+    <path d="M-11 -10 L0 -24 L0 -10 Z" fill="#C97551"/>
+    <path d="M11 -10 L0 -24 L0 -10 Z" fill="#8F4630"/>
+  </g>
+  <g transform="translate(262,1940)">
+    <rect x="-10" y="-12" width="20" height="16" fill="#F4EEDD" stroke="#37342B" stroke-width="1.5"/>
+    <path d="M-12 -12 L0 -27 L12 -12 Z" fill="#B65C3F"/>
+    <path d="M-12 -12 L0 -27 L0 -12 Z" fill="#C97551"/>
+    <path d="M12 -12 L0 -27 L0 -12 Z" fill="#8F4630"/>
+  </g>
+  <g transform="translate(292,1933)">
+    <rect x="-8" y="-9" width="16" height="13" fill="#F4EEDD" stroke="#37342B" stroke-width="1.5"/>
+    <path d="M-10 -9 L0 -22 L10 -9 Z" fill="#B65C3F"/>
+    <path d="M-10 -9 L0 -22 L0 -9 Z" fill="#C97551"/>
+    <path d="M10 -9 L0 -22 L0 -9 Z" fill="#8F4630"/>
+  </g>
+  <text x="262" y="2000" font-family="Georgia, 'Times New Roman', serif" font-style="italic"
+        font-size="26" fill="#37342B" text-anchor="middle">Thistledown</text>
+</g>
+
+<!-- Crosswater — further-unreached pin, dashed outline, no chip, plain label -->
+<g>
+  <use href="#teardrop" transform="translate(380,1680) scale(0.7857) translate(-540,-1050)"
+       fill="none" stroke="#37342B" stroke-opacity="0.6" stroke-width="2" stroke-dasharray="5 4"/>
+  <text x="330" y="1660" font-family="Georgia, 'Times New Roman', serif" font-style="italic"
+        font-size="24" fill="#37342B" text-anchor="middle">Crosswater</text>
+</g>
+
+<!-- Silvergate — "Next" pin: solid fill, reward ring, chip always shown -->
+<g>
+  <circle cx="470" cy="1206.4" r="39" fill="none" stroke="#D6A64B" stroke-width="6"/>
+  <use href="#teardrop" transform="translate(474,1265) scale(1.0714) translate(-540,-1050)" fill="#37342B"/>
+  <use href="#teardrop" transform="translate(470,1260) scale(1.0714) translate(-540,-1050)"
+       fill="#5B8A4B" stroke="#37342B" stroke-width="3"/>
+  <circle cx="470" cy="1206.4" r="9" fill="#F4EEDD"/>
+  <rect x="380" y="1126.4" width="180" height="44" rx="7" fill="#F4EEDD" stroke="#37342B" stroke-width="2"/>
+  <text x="470" y="1155" font-family="Georgia, 'Times New Roman', serif" font-weight="700"
+        font-size="22" fill="#37342B" text-anchor="middle" letter-spacing="0.5">SILVERGATE</text>
+</g>
+
+<!-- Ember Spire — destination pin: dashed further-unreached body, chip always shown -->
+<g>
+  <use href="#teardrop" transform="translate(540,905) scale(1.0714) translate(-540,-1050)"
+       fill="none" stroke="#37342B" stroke-opacity="0.6" stroke-width="2" stroke-dasharray="5 4"/>
+  <rect x="445" y="771.4" width="190" height="44" rx="7" fill="#F4EEDD" stroke="#37342B" stroke-width="2"/>
+  <text x="540" y="800" font-family="Georgia, 'Times New Roman', serif" font-weight="700"
+        font-size="22" fill="#37342B" text-anchor="middle" letter-spacing="0.5">EMBER SPIRE</text>
+</g>
+
+<!-- Compass rose, bottom-right -->
+<g>
+  <circle cx="830" cy="1900" r="70" fill="none" stroke="#37342B" stroke-width="2"/>
+  <circle cx="830" cy="1900" r="6" fill="#37342B"/>
+  <path d="M830 1830 L842 1900 L818 1900 Z" fill="#37342B"/>
+  <path d="M830 1970 L842 1900 L818 1900 Z" fill="#6E6658"/>
+  <path d="M900 1900 L830 1888 L830 1912 Z" fill="#8C8574"/>
+  <path d="M760 1900 L830 1888 L830 1912 Z" fill="#8C8574"/>
+  <g fill="#D6A64B">
+    <rect x="857" y="1863" width="10" height="10" transform="rotate(45 862 1868)"/>
+    <rect x="857" y="1927" width="10" height="10" transform="rotate(45 862 1932)"/>
+    <rect x="793" y="1927" width="10" height="10" transform="rotate(45 798 1932)"/>
+    <rect x="793" y="1863" width="10" height="10" transform="rotate(45 798 1868)"/>
+  </g>
+  <text x="830" y="1815" font-family="Georgia, 'Times New Roman', serif" font-weight="700"
+        font-size="22" fill="#37342B" text-anchor="middle">N</text>
+</g>
+
+<!-- ===================== Title cartouche ===================== -->
+<rect x="290" y="120" width="500" height="280" rx="16" fill="#F4EEDD" stroke="#37342B" stroke-width="3"/>
+<g fill="#37342B">
+  <rect x="296" y="126" width="10" height="10" transform="rotate(45 301 131)"/>
+  <rect x="774" y="126" width="10" height="10" transform="rotate(45 779 131)"/>
+  <rect x="296" y="384" width="10" height="10" transform="rotate(45 301 389)"/>
+  <rect x="774" y="384" width="10" height="10" transform="rotate(45 779 389)"/>
+</g>
+<text x="540" y="248" font-family="Georgia, 'Times New Roman', serif" font-weight="700"
+      font-size="62" fill="#37342B" text-anchor="middle">JourneyTracker</text>
+<line x1="360" y1="278" x2="720" y2="278" stroke="#37342B" stroke-width="2" stroke-dasharray="7 5"/>
+<text x="540" y="326" font-family="system-ui, sans-serif" font-weight="600" font-size="24"
+      fill="#8C6A2E" text-anchor="middle" letter-spacing="0.4">A hand-drawn road to Ember Spire</text>
+<text x="540" y="366" font-family="Georgia, 'Times New Roman', serif" font-style="italic"
+      font-size="18" fill="#37342B" text-anchor="middle" opacity="0.7">1,800 miles, waypoint by waypoint</text>
+
+</svg>

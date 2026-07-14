@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+<!--
+  JourneyTracker app icon · Direction A — "Peak + Aura (minimal)"
+  Derived from Mockups/CoverD_Composite.svg: Ember Spire (snow-capped, faceted,
+  hard-offset-shadow mountain) centered big, the flat gold aura radiating behind
+  it, full-bleed. No waypoint pin, no trail — just the mark, distilled to its
+  cleanest, most legible form. Background is made deliberately BOLD (a full-bleed
+  gold wash under the aura rings, not bare parchment) so the icon pops as a warm
+  golden badge on a home screen instead of reading as a pale tan square next to
+  other apps.
+
+  Full-bleed square, no transparency, no rounded corners (iOS masks corners).
+  All content sits within the ~80% safe center (x/y 102–922 of 1024).
+
+  Token → hex map (see docs/DESIGN_SYSTEM.md §02/§04/§07 — static SVG can't bind
+  runtime tokens, same convention as the source cover):
+    bg/parchment #E8DEC0 · accent/reward #D6A64B
+    terrain/stone #8C8574 (facet tints #A6A08D highlight / #6E6658 shadow,
+      hard-offset-shadow copy #2E2A22)
+    terrain/snow #EDE8DC (facet tints #F7F4EC highlight / #D9D2C0 shadow)
+-->
+
+<!-- Background: parchment base + full-bleed gold wash (bold treatment) -->
+<rect x="0" y="0" width="1024" height="1024" fill="#E8DEC0"/>
+<rect x="0" y="0" width="1024" height="1024" fill="#D6A64B" opacity="0.16"/>
+
+<!-- Gold aura: flat concentric opacity steps, never a gradient -->
+<circle cx="512" cy="480" r="380" fill="#D6A64B" opacity="0.16"/>
+<circle cx="512" cy="480" r="290" fill="#D6A64B" opacity="0.22"/>
+<circle cx="512" cy="480" r="205" fill="#D6A64B" opacity="0.30"/>
+<circle cx="512" cy="480" r="130" fill="#D6A64B" opacity="0.42"/>
+
+<!-- Ember Spire: hard offset shadow, then ridge-split body, then snow cap -->
+<path d="M538 310 L870 890 L206 890 Z" fill="#2E2A22"/>
+<path d="M512 280 L180 860 L512 860 Z" fill="#A6A08D"/>
+<path d="M512 280 L512 860 L844 860 Z" fill="#6E6658"/>
+<path d="M512 280 L363 540 L512 540 Z" fill="#F7F4EC"/>
+<path d="M512 280 L512 540 L661 540 Z" fill="#D9D2C0"/>
+
+</svg>

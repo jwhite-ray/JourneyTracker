@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+<!--
+  JourneyTracker app icon · Direction B — "Peak + Marker"
+  Same Ember Spire + gold aura as Direction A, plus the unnamed green waypoint
+  pin peeking from behind the peak's upper-left flank (per CoverD_Composite.svg
+  and the §07.8 pin anatomy: teardrop body, hard offset shadow, accent/reward
+  emphasis ring, surface/card center dot) — the "journey/tracking" cue, a touch
+  more story than the bare peak, still simple. The pin is drawn BEHIND the
+  mountain so its tip is occluded and only the ring + head poke out, exactly the
+  KAN-21 "peeking" treatment from the cover art.
+
+  Background is kept QUIET here on purpose — plain parchment with a softer,
+  smaller aura than Direction A — so the extra pin content doesn't compete with
+  a loud background; the two added elements (peak + pin) carry the icon's
+  interest instead.
+
+  Full-bleed square, no transparency, no rounded corners. All content within the
+  ~80% safe center (x/y 102–922 of 1024).
+
+  Token → hex map (static SVG can't bind runtime tokens):
+    bg/parchment #E8DEC0 · accent/reward #D6A64B · accent/primary #5B8A4B (pin
+      body — the map's generic/unnamed waypoint marker) · ink #37342B (pin
+      stroke + hard offset shadow) · surface/card #F4EEDD (pin center dot)
+    terrain/stone #8C8574 (facet tints #A6A08D / #6E6658, hard-offset-shadow
+      #2E2A22) · terrain/snow #EDE8DC (facet tints #F7F4EC / #D9D2C0)
+-->
+
+<!-- Background: plain parchment -->
+<rect x="0" y="0" width="1024" height="1024" fill="#E8DEC0"/>
+
+<!-- Gold aura: smaller, quieter than Direction A -->
+<circle cx="512" cy="480" r="300" fill="#D6A64B" opacity="0.16"/>
+<circle cx="512" cy="480" r="225" fill="#D6A64B" opacity="0.22"/>
+<circle cx="512" cy="480" r="160" fill="#D6A64B" opacity="0.30"/>
+<circle cx="512" cy="480" r="100" fill="#D6A64B" opacity="0.42"/>
+
+<!-- Waypoint pin — drawn BEHIND the peak so its tip is hidden, ring + head peek
+     out above/behind the mountain's upper-left slope (§07.8 anatomy) -->
+<g>
+  <circle cx="427" cy="383" r="54" fill="none" stroke="#D6A64B" stroke-width="10"/>
+  <path d="M427 458 C427 458 395 415 395 383 A46 46 0 1 1 473 383 C473 415 427 458 427 458 Z"
+        fill="#37342B" transform="translate(6,7)"/>
+  <path d="M427 458 C427 458 395 415 395 383 A46 46 0 1 1 473 383 C473 415 427 458 427 458 Z"
+        fill="#5B8A4B" stroke="#37342B" stroke-width="8"/>
+  <circle cx="427" cy="383" r="12" fill="#F4EEDD"/>
+</g>
+
+<!-- Ember Spire: hard offset shadow, then ridge-split body, then snow cap —
+     drawn AFTER the pin so it occludes the pin's tip/lower body -->
+<path d="M538 310 L870 890 L206 890 Z" fill="#2E2A22"/>
+<path d="M512 280 L180 860 L512 860 Z" fill="#A6A08D"/>
+<path d="M512 280 L512 860 L844 860 Z" fill="#6E6658"/>
+<path d="M512 280 L363 540 L512 540 Z" fill="#F7F4EC"/>
+<path d="M512 280 L512 540 L661 540 Z" fill="#D9D2C0"/>
+
+</svg>
