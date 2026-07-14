@@ -292,7 +292,9 @@ private struct JourneyCard: View {
                     NavigationLink {
                         JourneyMapView(journey: journey)
                     } label: {
-                        StampButtonLabel(title: "View Map", fillToken: journey.theme.accentColorToken)
+                        // Opens the "journey view" (the tab renamed per Justin's
+                        // 2026-07-12 two-surface ruling). Identifier kept stable.
+                        StampButtonLabel(title: "View Journey", fillToken: journey.theme.accentColorToken)
                     }
                     .buttonStyle(.plain)
                     .accessibilityIdentifier("list.viewMapButton.\(journey.name)")

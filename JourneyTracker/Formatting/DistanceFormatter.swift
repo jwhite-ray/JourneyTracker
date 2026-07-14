@@ -24,6 +24,14 @@ enum DistanceFormatter {
         return "\(milesNumber(meters)) mi"
     }
 
+    /// The single meters→miles conversion for NUMERIC consumers (e.g. the map's
+    /// marker mileage along the trek path). Keeps every `/ metersPerMile` inside
+    /// this one authority — a caller that needs a number, not a string, uses this
+    /// rather than dividing in a view (KAN-21).
+    static func miles(_ meters: Double) -> Double {
+        meters / metersPerMile
+    }
+
     /// A bare miles numeral (no unit), e.g. "730" or "1,800".
     static func milesNumber(_ meters: Double) -> String {
         let miles = meters / metersPerMile
