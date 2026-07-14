@@ -14,3 +14,4 @@ source files are removed. Naming: `<Variant><index>_<state>.png`.
 | KAN-7 | Journey map (A Ink Trail / B Stepping Stones / C Map First) | A |
 | KAN-10 | Lifecycle cards (A Eyebrow Row / B Chip Row / C Stamp+Kebab) | C (straight stamp) |
 | KAN-11 | Available Journeys store (A Card Stack / B Compact Manifest / C Hero+List) | B, with A's empty state ("Start a Journey" CTA) |
+| KAN-27 | Wren redesign, 4 rounds (colors → eyes → head): green + neutral face + curly hair | Fernwood Moss cloak `#5F6B4D` · neutral walking face (soft brows, gaze up, thin lower lid) · bare curly hair (`char/hair` `#8B5A34`), hood removed |

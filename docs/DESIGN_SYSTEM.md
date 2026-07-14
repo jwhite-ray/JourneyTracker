@@ -1,4 +1,4 @@
-# JourneyTracker — Design System v1.10
+# JourneyTracker — Design System v1.11
 
 **Status:** living document · owned by Jeff (design) · iOS · SwiftUI
 **Scope:** this document passes **style only** — color, type, shape, layout, the character rig, and the faceted terrain/cartography system. It does not define behavior, data models, units, or progress math. Those live in `docs/JourneyTracker_App_Concept.md`, which wins on any such question.
@@ -27,6 +27,8 @@ Every step you walk carries a wayfarer closer to the summit along the 1,800-mile
 
 > **v1.10 change log.** Canonicalized waypoint pin rendering (Justin's KAN-21 ruling during Phase 4 review, 2026-07-13): the faceted teardrop-and-chip pin anatomy already drawn on terrain-authored maps — teardrop body with a hard offset shadow; reached = solid `journey.theme.accentColorToken` fill + `surface/card` center dot; next = the same solid fill plus an `accent/reward` emphasis ring and an always-shown Cinzel chip; further-unreached = 2pt dashed `ink` outline at 60%, no fill, no dot, no chip; destination = its chip always shows, whatever its state — is now **the single rendering for every map surface**, not just the terrain Canvas. This explicitly includes the KAN-7 pin-and-route screen, which remains the fallback for journeys without authored map art: it now draws the identical anatomy as SwiftUI shapes rather than its own callout language. New **§07.8 "Waypoint pin & chip anatomy"** documents the shared geometry once, for any renderer (Canvas draw pass or SwiftUI shape stack) that draws it; former §07.8 "Handoff notes" is renumbered **§07.9**, nothing in it changed. §08's "Waypoint & marker states" is reworked to hold **state semantics only** (reached/next/further-unreached/destination), pointing at §07.8 for how each state actually renders, and its old "pin/badge shape is still open" framing is gone. The original KAN-7 mockup's callout language — the `WaypointCallout` name bubble (radius 5, 1.5pt stroke, no facet shadow) and the checkmark/star SF Symbol glyphs drawn inside `WaypointPin`'s reached/completed states — is now flagged **dead** in §07.8 and §08: it describes no shipping surface as of this ruling. §06's pin sentence is likewise replaced with a pointer to §07.8 rather than a second, now-stale restatement of pin geometry. **Correction (Rooster's review):** the §08 button label list and Kebab-menu note still read "View Map" from before the KAN-21 journey-view naming ruling; both are corrected here to "View Journey."
 
+> **v1.11 change log.** Ported the finalized KAN-27 Wren redesign into §02 and §04: **(1)** `char/cloak` is retinted Cloak Brown `#7A6A4F` → **Fernwood Moss `#5F6B4D`** (same token, new hue — still the neutral prop tone for cloak, staff, pack, and back arm). **(2)** New character-color token **`char/hair` = `#8B5A34` "Chestnut Curl"**, added to §02, for the curly-hair facets. **(3)** The old pentagon "hood" (it read as a bishop's mitre) is removed from the construction order and fixed proportions; Wren is now bare-headed with a cluster of small faceted circles for curly hair, hugging the crown with a fringe just above the brows, ears still visible at the sides. **(4)** The mid-walk emotional state changes from "Determined" (brows angled in-down) — which read as angry — to a neutral/calm expression: soft-raised brows, gaze directed up-and-forward, forward lean retained. **(5)** A thin skin-tone lower eyelid is added to the eye spec, clipped to the eye circle — the no-mouth hard rule is unaffected, the lid is part of the eye, not a mouth.
+
 ---
 
 ## 01 · Brand principles
@@ -54,7 +56,8 @@ Authored in oklch; hex fallbacks given for iOS asset catalogs. **The token name 
 | Reward Gold | `accent/reward` | `#D6A64B` | badges, rewards |
 | Ember Red | `accent/alert` | `#B23A2E` | streak risk, alert |
 | Wayfarer Skin | `char/skin` | `#D8B58C` | faces, ears, feet |
-| Cloak Brown | `char/cloak` | `#7A6A4F` | cloak / neutral prop |
+| Fernwood Moss | `char/cloak` | `#5F6B4D` | cloak / neutral prop (staff, pack, back arm) |
+| Chestnut Curl | `char/hair` | `#8B5A34` | curly-hair facets (KAN-27) |
 | Card Cream | `surface/card` | `#F4EEDD` | card surfaces |
 | Deepdark | `bg/dark` | `#12201A` | dark mode base |
 
@@ -110,9 +113,9 @@ One rig, re-posed and re-skinned. Each body part is a rounded shape holding thre
 
 Default character: **Wren**, a wayfarer of the small-folk.
 
-**Construction order (back → front):** shadow ellipse → feet → back arm → staff → pack → body (cloak) → belt → ears → face circle → hood → eye whites → pupils → eyebrows
+**Construction order (back → front):** shadow ellipse → feet → back arm → staff → pack → body (cloak) → belt → ears → face circle → hair (curly, faceted) → eye whites → pupils → lower eyelids → eyebrows
 
-**Fixed proportions** (on a 180×216 box): head ⌀60 · hood 76×64 pentagon · body 90×68 r20 · arms 26×56 r13 · feet 24×38 · eye white ⌀16, pupil ⌀7. Big feet, no visible hands = the small-folk read.
+**Fixed proportions** (on a 180×216 box): head ⌀60 · body 90×68 r20 · arms 26×56 r13 · feet 24×38 · eye white ⌀16, pupil ⌀7. Big feet, no visible hands = the small-folk read.
 
 **Facet recipe (per shape):**
 1. base = mid tone
@@ -121,15 +124,19 @@ Default character: **Wren**, a wayfarer of the small-folk.
 
 Clip each facet to the parent's rounded silhouette. In SwiftUI: `.clipShape(RoundedRectangle(...))` on a `ZStack`, with each facet a `Path` — the original CSS `clip-path: polygon(0 0, 100% 0, 100% 45%, 0 70%)` becomes a four-point `Path` in the shape's local coordinate space.
 
-**Emotional states — brows + posture only, never a mouth:**
+**Hair (KAN-27).** Wren is bare-headed — no hood, no headwear of any kind. A cluster of small faceted circles in `char/hair`, each carrying the standard three-facet recipe above (base + top-left highlight + bottom-right shadow), hugs the crown of the head circle, with a hairline fringe sitting just above the brows. Ears remain visible at the sides, unobscured. This replaces the old 76×64 pentagon "hood," which read as a bishop's mitre and is gone from the rig entirely — not left as an alternate option.
+
+**Eyes.** Eye white (⌀16) + pupil (⌀7), per the fixed proportions above. A thin skin-tone (`char/skin`) lower eyelid — a shallow curve clipped to the eye white's circle — sits along the eye's lower edge on every state. This is the rig's one warmth cue given the no-mouth rule below; it is part of the eye, not a mouth, and does not relax the hard rule.
+
+**Emotional states — brows + eyelids + posture only, never a mouth:**
 
 | State | Expression |
 |---|---|
-| Determined | brows angled in-down, forward lean |
+| Calm / walking | soft-raised brows (outer edge up, gentle — not angled in-down), gaze directed slightly up and forward (pupils raised), thin lower eyelid, forward lean |
 | Worn out | heavy lids, drooped brows, hunch |
 | Fresh start | raised brows, blush, mid-hop |
 
-State is driven by daily activity: fresh in the morning or after hitting a goal, determined mid-walk, worn out when the streak is at risk or late in the day.
+State is driven by daily activity: fresh in the morning or after hitting a goal, calm/neutral mid-walk, worn out when the streak is at risk or late in the day.
 
 **Ship as a layered vector** — an SVG or SwiftUI shape stack, not a raster — so facet colors and brow/posture states can be swapped at runtime.
 
@@ -317,7 +324,7 @@ Draw order and z-index (pins always last, above the world-edge border) are uncha
 | Next (the single upcoming waypoint) | The one waypoint currently being walked toward — there is ever exactly one. | Per §07.8's "Next" recipe. Name chip always shown, not tap-to-reveal — the other waypoint whose chip is always shown is the destination (see below). |
 | Further unreached | Not yet next, not yet reached. | Per §07.8's "Further unreached" recipe — outline only, no chip by default. Same locked language as milestone badges (§08) — **except** the destination waypoint, which always shows its chip even while further-unreached (see below). |
 | Destination | The journey's final waypoint, whatever its other state. | Pin body follows its own row above exactly; its Cinzel chip always shows regardless of state — see the destination label rule below. |
-| Completed-journey final waypoint | The journey is finished; the wayfarer marker is parked at the destination. | Same solid-teardrop-with-dot recipe as "Reached" (§07.8), filled `accent/reward` instead of the journey's theme accent. Wren himself — a separate system, §04 / §07.9 — is posed "fresh" (raised brows, no forward lean) beside it with an `accent/reward` ring or pixel glyph attached, and must read as *stopped*, distinct from mid-route "determined"/"worn out" walking poses. |
+| Completed-journey final waypoint | The journey is finished; the wayfarer marker is parked at the destination. | Same solid-teardrop-with-dot recipe as "Reached" (§07.8), filled `accent/reward` instead of the journey's theme accent. Wren himself — a separate system, §04 / §07.9 — is posed "fresh" (raised brows, no forward lean) beside it with an `accent/reward` ring or pixel glyph attached, and must read as *stopped*, distinct from mid-route "calm/neutral"/"worn out" walking poses. |
 
 **Destination label rule (Gate 1 ruling, KAN-18).** The journey's destination waypoint — the final one, e.g. Ember Spire — always shows its Cinzel name chip, in every state: reached, next, or further-unreached. This replaces the earlier rule that "next" was the *only* waypoint always labelled; now next **and** the destination both are, and there is no longer a state in which the destination's name is tap-to-reveal. The chip is additive only — it never changes the destination's pin *body*, which still follows its row above exactly like any other waypoint in that state (an unreached destination keeps the dashed-outline, 60%-opacity treatment from the "Further unreached" row; its name chip simply floats above that outline instead of being withheld).
 
