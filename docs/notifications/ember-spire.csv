@@ -1,0 +1,8 @@
+hook,order,waypoint,cumulative_miles,title_template,body_template,artwork_asset,notes
+waypoint_reached,1,Crosswater,120,{character} reached Crosswater,"120 miles from Thistledown. Silvergate lies {miles_to_next} ahead.",,PROVISIONAL — identity under review (KAN-25)
+waypoint_reached,2,Silvergate,460,Silvergate reached,"{character} passes the silver gates. The Deepdelve waits {miles_to_next} on.",,PROVISIONAL — identity under review (KAN-25)
+waypoint_reached,3,The Deepdelve,660,{character} reached The Deepdelve,"Into the deep places. Whisperwood lies {miles_to_next} beyond.",,PROVISIONAL — identity under review (KAN-25)
+waypoint_reached,4,Whisperwood,720,Whisperwood reached,"Out of the dark and under the leaves. The Windmark stands {miles_to_next} ahead.",,PROVISIONAL — identity under review (KAN-25)
+waypoint_reached,5,The Windmark,1040,{character} reached The Windmark,"Over a thousand miles walked. Whitewatch waits {miles_to_next} on.",,PROVISIONAL — identity under review (KAN-25)
+waypoint_reached,6,Whitewatch,1540,Whitewatch reached,"The last watch before the spire. Ember Spire burns {miles_to_next} beyond.",,PROVISIONAL — identity under review (KAN-25)
+journey_complete,7,Ember Spire,1800,Ember Spire!,"{character} stands at the spire — {total_miles} walked from Thistledown.",,PROVISIONAL — identity under review (KAN-25)

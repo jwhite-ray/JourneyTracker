@@ -160,7 +160,7 @@ The first journey authored through the KAN-23 hand-drawn-map pipeline: Justin dr
 | 8 | Rivergate | 0.9160 | 0.5804 |
 | 9 | The Windrise Peaks | 0.9118 | 0.0469 |
 
-*Around the World* (real-world, no waypoints) is the "journey with no waypoints" case the map must degrade gracefully against.
+*Around the World* (real-world, no waypoints *today*) is the "journey with no waypoints" case the map must degrade gracefully against — but that state is **transitional, not permanent**. **Ruling (Justin, 2026-07-14): a journey's development is complete only when it has waypoints, a map, and notification content** (`docs/notifications/`). Around the World will receive authored waypoints before it is considered done; the zero-waypoint degradation path remains required as the authoring-stage state every journey passes through, not as any journey's final form. *(Recorded by the main session as a light-path doc update — Jake reviews on next architectural pass.)*
 
 **Character 1 — "Wren,"** a faceted wayfarer of the small-folk. Additional characters follow the same `Character` model.
 
