@@ -1,0 +1,6 @@
+hook,order,waypoint,cumulative_miles,title_template,body_template,artwork_asset,notes
+waypoint_reached,1,First Rest,1,{character} reached First Rest,"One mile in — the trail settles into rhythm. Willowbend waits {miles_to_next} ahead.",,
+waypoint_reached,2,Willowbend,3,Willowbend reached,"{character} rests where the river bends. Old Oak stands {miles_to_next} on.",,
+waypoint_reached,3,Old Oak,7,{character} reached Old Oak,"Seven miles walked. The old giant marks the turn toward Lastlight Bridge.",,
+waypoint_reached,4,Lastlight Bridge,9,Lastlight Bridge crossed,"Nine miles down — one to go. Journey's End is almost in sight.",,
+journey_complete,5,Journey's End,10,Journey complete!,"{character} has reached Journey's End — {total_miles} walked, start to finish.",,

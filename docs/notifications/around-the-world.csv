@@ -1,0 +1,5 @@
+hook,order,waypoint,cumulative_miles,title_template,body_template,artwork_asset,notes
+percent_25,,,,A quarter of the way around,"{miles_walked} walked — the world turns beneath your feet.",,fires when percent milestones ship (KAN-37)
+percent_50,,,,Halfway around the world,"{miles_walked} down, {miles_remaining} to go. The far side of the globe.",,fires when percent milestones ship (KAN-37)
+percent_75,,,,Three quarters around,"The home stretch begins — {miles_remaining} remain.",,fires when percent milestones ship (KAN-37)
+journey_complete,,,,Around the world!,"{character} has circled the globe — {total_miles} on foot.",,

@@ -1,0 +1,10 @@
+hook,order,waypoint,cumulative_miles,title_template,body_template,artwork_asset,notes
+waypoint_reached,1,Millhollow,14.2,{character} reached Millhollow,"Fourteen miles from the coast, the mill wheels turn slow. Sable Ford lies {miles_to_next} ahead.",,
+waypoint_reached,2,Sable Ford,20.9,Sable Ford crossed,"The dark water parts. A long stretch to Hallowmere begins — {miles_to_next} of quiet country.",,
+waypoint_reached,3,Hallowmere,72.9,{character} reached Hallowmere,"Seventy-three miles walked. The still mere mirrors the peaks to come.",,
+waypoint_reached,4,Oxbow Crossing,122.6,Oxbow Crossing reached,"The river doubles back on itself here. Thistlewood waits {miles_to_next} on.",,
+waypoint_reached,5,Thistlewood,153.9,{character} reached Thistlewood,"Past the halfway mark, through the wood's thorny heart. Farrow's Rest lies {miles_to_next} ahead.",,
+waypoint_reached,6,Farrow's Rest,172.1,Farrow's Rest reached,"A warm hearth at last. From here the road climbs toward Stonewash Ford.",,
+waypoint_reached,7,Stonewash Ford,218.8,Stonewash Ford crossed,"White water over pale stone. Rivergate stands {miles_to_next} ahead.",,
+waypoint_reached,8,Rivergate,227.7,{character} reached Rivergate,"The last gate before the climb. The Windrise Peaks rise {miles_to_next} beyond.",,
+journey_complete,9,The Windrise Peaks,302.4,The Windrise Peaks!,"{character} stands at the summit — {total_miles} walked from Wavecrest to the peaks.",,

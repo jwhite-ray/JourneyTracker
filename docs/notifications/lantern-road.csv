@@ -1,0 +1,4 @@
+hook,order,waypoint,cumulative_miles,title_template,body_template,artwork_asset,notes
+waypoint_reached,1,Foglow Bridge,3,Foglow Bridge crossed,"Three miles from Wickgate, the fog thins. A long road to Palefire Hollow begins — {miles_to_next} of open country.",,
+waypoint_reached,2,Palefire Hollow,17,{character} reached Palefire Hollow,"Seventeen miles walked. The lanterns of Lanternrest glow just {miles_to_next} ahead.",,
+journey_complete,3,Lanternrest,20,The Lantern Road is complete!,"{character} arrives at Lanternrest — {total_miles} from first light to last.",,
