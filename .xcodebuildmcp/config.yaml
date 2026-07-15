@@ -1,0 +1,12 @@
+# XcodeBuildMCP project config.
+# Enables the ui-automation workflow (tap/swipe/type/snapshot) on top of the
+# default session-management + simulator workflows, so the QA role (Jeremiah)
+# and the main session can drive the Simulator — e.g. tapping the iOS system
+# permission alert in the KAN-32 notification flow.
+# AXe (the UI-automation helper) ships bundled with XcodeBuildMCP; no install needed.
+# NOTE: takes effect only when the MCP server restarts (restart Claude Code).
+enabledWorkflows:
+  - session-management
+  - simulator
+  - ui-automation
+

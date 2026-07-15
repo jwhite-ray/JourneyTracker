@@ -12,6 +12,7 @@ import SwiftData
 
 struct DebugView: View {
     @Environment(HealthKitManager.self) private var health
+    @Environment(NotificationManager.self) private var notifications
     @Environment(\.modelContext) private var modelContext
 
     @Query(sort: \UserJourney.startDate) private var journeys: [UserJourney]
@@ -22,6 +23,7 @@ struct DebugView: View {
             List {
                 authorizationSection
                 advisorySection
+                notificationsSection
                 journeysSection
                 anchorSection
                 mapFixtureValidationSection
@@ -59,6 +61,34 @@ struct DebugView: View {
                     .foregroundStyle(.orange)
                     .accessibilityIdentifier("debug.advisory")
             }
+        }
+    }
+
+    // MARK: Notifications (KAN-32, Phase 0)
+
+    /// Mirrors the HealthKit authorization section's style: an honest readout of
+    /// the observable 3-state authorization, plus a dev-only trigger that fires a
+    /// sample milestone through the REAL enqueue primitive so the plumbing is
+    /// verifiable without walking. Denied/undetermined ⇒ the trigger silently
+    /// drops the request (no notification, no crash).
+    private var notificationsSection: some View {
+        Section("Notifications (KAN-32)") {
+            labeledRow("Authorization", notifications.authorization.rawValue,
+                       identifier: "debug.notifications.authorization")
+
+            Button("Refresh authorization status") {
+                Task { await notifications.refreshAuthorizationStatus() }
+            }
+            .accessibilityIdentifier("debug.notifications.refreshButton")
+
+            Button("Fire sample milestone (dev)") {
+                notifications.fireDebugSample()
+            }
+            .accessibilityIdentifier("debug.notifications.fireSampleButton")
+
+            Text("Local-only, Phase 0 plumbing. The contextual permission prompt fires from the start-journey flow, never here. The sample uses placeholder dev copy — not real milestone text.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -258,5 +288,6 @@ struct DebugView: View {
 #Preview {
     DebugView()
         .environment(HealthKitManager.shared)
+        .environment(NotificationManager.shared)
         .modelContainer(SharedModelContainer.shared)
 }
