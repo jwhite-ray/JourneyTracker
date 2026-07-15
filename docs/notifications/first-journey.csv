@@ -1,6 +1,6 @@
 hook,order,waypoint,cumulative_miles,title_template,body_template,artwork_asset,notes
-waypoint_reached,1,First Rest,1,{character} reached First Rest,"One mile in — the trail settles into rhythm. Willowbend waits {miles_to_next} ahead.",,
-waypoint_reached,2,Willowbend,3,Willowbend reached,"{character} rests where the river bends. Old Oak stands {miles_to_next} on.",,
-waypoint_reached,3,Old Oak,7,{character} reached Old Oak,"Seven miles walked. The old giant marks the turn toward Lastlight Bridge.",,
-waypoint_reached,4,Lastlight Bridge,9,Lastlight Bridge crossed,"Nine miles down — one to go. Journey's End is almost in sight.",,
-journey_complete,5,Journey's End,10,Journey complete!,"{character} has reached Journey's End — {total_miles} walked, start to finish.",,
+waypoint_reached,1,Mallow Bend,1.94,{character} reached Mallow Bend,"Two miles on, the path bends past the low water. Greenway Cross lies {miles_to_next} ahead.",,
+waypoint_reached,2,Greenway Cross,4.19,Greenway Cross reached,"{character} passes through the green commons. Fenwick Rise climbs {miles_to_next} on.",,
+waypoint_reached,3,Fenwick Rise,6.70,{character} reached Fenwick Rise,"The high turn of the route — nearly seven miles walked. Rushmere waits {miles_to_next} ahead.",,
+waypoint_reached,4,Rushmere,8.54,Rushmere reached,"Still water below the crags. Just {miles_remaining} left to Cragmouth Gate.",,
+journey_complete,5,Cragmouth Gate,10,Cragmouth Gate!,"{character} reaches the canyon shore — {total_miles} walked from Fernhollow to the reservoir gate.",,

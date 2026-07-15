@@ -11,8 +11,8 @@
 //  callers keep asking `authoring(for:)` and never change.
 //
 //  A journey WITHOUT an entry here has no faceted map and renders the KAN-7
-//  pin-and-route fallback (Ember Spire / First Journey / Lantern Road / Around the
-//  World). The lookup returns the same frozen `MapAuthoring` value on every call —
+//  pin-and-route fallback (Ember Spire / Lantern Road / Around the World). The
+//  lookup returns the same frozen `MapAuthoring` value on every call —
 //  the map is a pure function of (regions, seed), identical for every user.
 //
 
@@ -24,7 +24,8 @@ enum MapAuthoringCatalog {
     /// evaluated once and cached in this static, so repeated lookups are free and
     /// the frozen authoring input is shared by every screen that renders it.
     private static let authoringByTemplateName: [String: MapAuthoring] = [
-        "Road to The Windrise Peaks": WindrisePeaksMap.make()
+        "Road to The Windrise Peaks": WindrisePeaksMap.make(),
+        "First Journey": FirstJourneyMap.make()
     ]
 
     /// The faceted authoring for a template, or `nil` when the journey has none
