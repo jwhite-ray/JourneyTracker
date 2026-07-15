@@ -49,7 +49,22 @@ final class NotificationManager {
 
     private init() {}
 
+    /// The tap/foreground delegate (KAN-33 Ruling 8). Owned here — the only type
+    /// that touches `UNUserNotificationCenter` — and assigned at launch so a
+    /// cold-launch tap's `didReceive` is caught. A private NSObject conformer
+    /// because `UNUserNotificationCenterDelegate` requires ObjC dispatch.
+    private let deepLinkDelegate = MilestoneNotificationDelegate()
+
     // MARK: - Launch wiring (no prompt)
+
+    /// Installs the notification delegate and points it at the deep-link router,
+    /// once at launch alongside `registerCategories()` (KAN-33 Ruling 8). Assigning
+    /// the delegate BEFORE the system may hand over a launch tap ensures a
+    /// cold-launch `didReceive` is delivered. Prompt-free.
+    func assignDelegate(router: DeepLinkRouter) {
+        deepLinkDelegate.router = router
+        UNUserNotificationCenter.current().delegate = deepLinkDelegate
+    }
 
     /// Registers the milestone categories once at launch. `setNotificationCategories`
     /// does NOT prompt — it only declares the category ids Phase 1's requests
@@ -122,8 +137,17 @@ final class NotificationManager {
     /// Ruling 3, mirroring KAN-14's forward-only crossings). Denied/undetermined
     /// is a first-class, non-crashing no-op.
     nonisolated func enqueue(_ requests: [MilestoneNotificationRequest]) {
+        Self.enqueue(requests)
+    }
+
+    /// The same fire path as a `nonisolated` STATIC, so the ProgressStore
+    /// `@ModelActor` can enqueue during a delta WITHOUT reaching the `@MainActor`
+    /// `shared` (a cross-actor reference the compiler flags). Phase 1's
+    /// `ProgressUpdater.apply` calls this after `save`; the instance `enqueue`
+    /// (the KAN-32 primitive) delegates here — one delivery path, two shapes.
+    nonisolated static func enqueue(_ requests: [MilestoneNotificationRequest]) {
         guard !requests.isEmpty else { return }
-        Self.deliver(requests, trigger: nil)
+        deliver(requests, trigger: nil)
     }
 
     /// The detached add-loop shared by the real `enqueue` path and the dev
@@ -175,10 +199,9 @@ final class NotificationManager {
     /// (Ruling 3) — no crash.
     func fireDebugSample() {
         let sample = MilestoneNotificationRequest(
-            hook: .waypointReached,
+            milestone: .waypointReached(waypointID: UUID()),
             userJourneyID: UUID(),
             templateID: UUID(),
-            waypointID: UUID(),
             title: "[DEV] Sample milestone",
             body: "[DEV] Phase 0 notification plumbing — placeholder copy, not real milestone text."
         )
@@ -215,5 +238,43 @@ final class NotificationManager {
         case .notDetermined, .denied: return false
         @unknown default: return false
         }
+    }
+}
+
+// MARK: - Delegate (KAN-33 Rulings 7 & 8)
+
+/// The `UNUserNotificationCenterDelegate`, owned privately by NotificationManager
+/// (the only type touching `UNUserNotificationCenter`). It does two things and
+/// nothing else:
+///  • `willPresent` — quiet foreground policy (Ruling 7): present `[.banner, .list]`
+///    with NO `.sound`, so a milestone that lands while the app is foreground-active
+///    is a glanceable, silent banner that still stacks in Notification Center. The
+///    in-app UI already reflects progress; no sound over a live screen.
+///  • `didReceive` — tap-to-map (Ruling 8): hand the schema-v1 `userInfo` to the
+///    deep-link router, which resolves the instance and drives the tab + path.
+///
+/// `@MainActor` (the project's default isolation) so it can touch the MainActor
+/// router directly; the async delegate signatures satisfy the protocol.
+@MainActor
+final class MilestoneNotificationDelegate: NSObject, UNUserNotificationCenterDelegate {
+
+    /// The router taps route through. Weak: the router is owned by the App scene,
+    /// this delegate merely drives it. Never strong-retains navigation state.
+    weak var router: DeepLinkRouter?
+
+    /// Foreground presentation (Ruling 7): quiet banner, no sound.
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification
+    ) async -> UNNotificationPresentationOptions {
+        return [.banner, .list]
+    }
+
+    /// Tap handling (Ruling 8): route the schema-v1 payload to the map.
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        didReceive response: UNNotificationResponse
+    ) async {
+        router?.handle(userInfo: response.notification.request.content.userInfo)
     }
 }

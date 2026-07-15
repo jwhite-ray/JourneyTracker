@@ -27,24 +27,36 @@ struct JourneyTrackerApp: App {
 /// App shell. The journey list is the main screen; DebugView stays reachable as
 /// a second tab so KAN-6's HealthKit/persistence proof (and Jeremiah's
 /// XCUITest driver) keep working untouched.
+///
+/// KAN-33: owns the `DeepLinkRouter` and binds it to the TabView selection, so a
+/// milestone-notification tap can bring the Journeys tab forward and push the
+/// resolved journey's map (JourneyListView drives the path-based NavigationStack).
 private struct RootView: View {
     @Environment(HealthKitManager.self) private var health
     @Environment(NotificationManager.self) private var notifications
 
+    /// The single deep-link router, injected into the environment and bound to the
+    /// tab selection. The notification delegate (owned by NotificationManager)
+    /// drives it on a tap.
+    @State private var router = DeepLinkRouter()
+
     var body: some View {
-        TabView {
-            NavigationStack {
-                JourneyListView()
-            }
-            .tabItem {
-                Label("Journeys", systemImage: "map")
-            }
+        TabView(selection: $router.selectedTab) {
+            // The Journeys tab owns its own path-based NavigationStack (moved into
+            // JourneyListView per KAN-33 Ruling 8) so a tap can push onto its path.
+            JourneyListView()
+                .tag(DeepLinkRouter.Tab.journeys)
+                .tabItem {
+                    Label("Journeys", systemImage: "map")
+                }
 
             DebugView()
+                .tag(DeepLinkRouter.Tab.debug)
                 .tabItem {
                     Label("Debug", systemImage: "stethoscope")
                 }
         }
+        .environment(router)
         .task {
             // KAN-32: declare notification categories and read the current
             // authorization at launch — NEVER a permission prompt here (the
@@ -53,6 +65,11 @@ private struct RootView: View {
             // await — a first launch suspended at the HealthKit sheet must not
             // delay category registration (Rooster, KAN-32 finding 4).
             notifications.registerCategories()
+
+            // KAN-33 Ruling 8: assign the tap/foreground delegate at launch (beside
+            // registerCategories, prompt-free) so a cold-launch tap's `didReceive`
+            // is caught and routed through this router.
+            notifications.assignDelegate(router: router)
 
             // Owns launch: seeds the store and starts HealthKit once, so the
             // journey list has data even if the user never opens the Debug tab.
