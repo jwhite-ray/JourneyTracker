@@ -80,7 +80,7 @@ nonisolated enum NotificationSchema {
 
 /// One milestone notification, described by its Sendable fields. Phase 1 fills
 /// `title`/`body` (with placeholders already resolved via DistanceFormatter/
-/// StatFormatter, KAN-32 Ruling 4); Phase 0 accepts them as plain strings. The
+/// StatFormatter, KAN-32 Ruling 4); Phase 0 accepted them as plain strings. The
 /// request/thread/category identifiers and the userInfo are DERIVED here.
 ///
 /// `nonisolated` (opting out of the project's MainActor default isolation) so the
@@ -89,39 +89,44 @@ nonisolated enum NotificationSchema {
 /// boundary in Phase 1.
 nonisolated struct MilestoneNotificationRequest: Sendable {
 
-    /// Which milestone fired. The raw values match the CSV `hook` column and the
-    /// `userInfo.hook` string Phase 1's tap handler routes on.
-    enum Hook: String, Sendable {
-        case waypointReached = "waypoint_reached"
-        case journeyComplete = "journey_complete"
+    /// Which milestone fired — a sum type that carries the waypoint identity ONLY
+    /// where it exists (KAN-33 Ruling 1). This makes the two invalid states the
+    /// old `hook`/`waypointID?` pair allowed (`.waypointReached` with no id,
+    /// `.journeyComplete` with a stray id) unrepresentable, so every derivation
+    /// below has no nil-fallback branch and no "complete-with-waypoint" leak.
+    enum Milestone: Sendable {
+        case waypointReached(waypointID: UUID)
+        case journeyComplete
     }
 
-    let hook: Hook
+    let milestone: Milestone
     /// The specific run to deep-link to (stable UUID, never PersistentIdentifier).
     let userJourneyID: UUID
     /// The catalog template — lets a tap still resolve/route if the instance was
     /// deleted (KAN-32 Ruling 5).
     let templateID: UUID
-    /// Present for `.waypointReached`, nil for `.journeyComplete`.
-    let waypointID: UUID?
-    /// Already-resolved copy (Phase 1 fills placeholders); Phase 0 ships none.
+    /// Already-resolved copy (Phase 1 fills placeholders); Phase 0 shipped none.
     let title: String
     let body: String
 
     // MARK: - Derived on-the-wire shape (the single assembly point)
+
+    /// The `hook` string that matches the CSV `hook` column and the `userInfo.hook`
+    /// value the tap handler routes on (KAN-32 schema v1, unchanged).
+    private var hookRawValue: String {
+        switch milestone {
+        case .waypointReached: return "waypoint_reached"
+        case .journeyComplete: return "journey_complete"
+        }
+    }
 
     /// The idempotency/dedup key. A re-applied delta that re-adds the same
     /// milestone replaces the pending/delivered notification rather than
     /// duplicating it (combined with KAN-14's crossing idempotency guard, a
     /// re-applied delta never double-notifies).
     var requestIdentifier: String {
-        switch hook {
-        case .waypointReached:
-            // A waypoint hook must carry a waypointID; if one is ever missing,
-            // fall back to the completion key rather than emit an unstable id.
-            guard let waypointID else {
-                return NotificationSchema.completeRequestIdentifier(userJourneyID: userJourneyID)
-            }
+        switch milestone {
+        case .waypointReached(let waypointID):
             return NotificationSchema.waypointRequestIdentifier(
                 userJourneyID: userJourneyID, waypointID: waypointID)
         case .journeyComplete:
@@ -136,22 +141,23 @@ nonisolated struct MilestoneNotificationRequest: Sendable {
 
     /// The category this milestone belongs to (registered at launch).
     var categoryIdentifier: String {
-        switch hook {
+        switch milestone {
         case .waypointReached: return NotificationSchema.CategoryID.waypointReached
         case .journeyComplete: return NotificationSchema.CategoryID.journeyComplete
         }
     }
 
     /// The schema-v1 deep-link payload. UUIDs are stringified; `waypointID` is
-    /// present only for `.waypointReached`.
+    /// present only for `.waypointReached` — the schema keys are IDENTICAL to
+    /// KAN-32 (Ruling 1 keeps the on-the-wire contract stable).
     var userInfo: [String: Any] {
         var info: [String: Any] = [
             NotificationSchema.UserInfoKey.schemaVersion: NotificationSchema.schemaVersion,
-            NotificationSchema.UserInfoKey.hook: hook.rawValue,
+            NotificationSchema.UserInfoKey.hook: hookRawValue,
             NotificationSchema.UserInfoKey.userJourneyID: userJourneyID.uuidString,
             NotificationSchema.UserInfoKey.templateID: templateID.uuidString,
         ]
-        if let waypointID {
+        if case .waypointReached(let waypointID) = milestone {
             info[NotificationSchema.UserInfoKey.waypointID] = waypointID.uuidString
         }
         return info

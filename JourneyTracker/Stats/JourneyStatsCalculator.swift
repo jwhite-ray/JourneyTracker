@@ -73,7 +73,11 @@ struct JourneyStats: Equatable {
     let reachedLog: [ReachedWaypointRow]
 }
 
-enum JourneyStatsCalculator {
+/// `nonisolated` (opting out of the project's MainActor default isolation): a pure
+/// value-in, value-out calculator with no stored state, so it runs both on the
+/// main actor (the stats screens) AND on the ProgressStore actor's context while
+/// building milestone notifications during `apply` (KAN-33 Ruling 6).
+nonisolated enum JourneyStatsCalculator {
 
     /// Below this active-elapsed floor, pace/projection are withheld (Ruling 7).
     static let dataFloorSeconds: Double = 3_600 // 1 hour

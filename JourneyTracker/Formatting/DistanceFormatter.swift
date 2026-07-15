@@ -14,7 +14,12 @@
 
 import Foundation
 
-enum DistanceFormatter {
+/// `nonisolated` (opting out of the project's MainActor default isolation) so the
+/// single meters→miles formatting authority is callable off the main actor — the
+/// notification content provider fills `{miles_*}` placeholders on the ProgressStore
+/// actor's context during `apply` (KAN-33 Rulings 4 & 6). The `NumberFormatter`
+/// statics are `Sendable` (and read-only), so they stay plain `let`s.
+nonisolated enum DistanceFormatter {
 
     /// Meters in one statute mile.
     static let metersPerMile: Double = 1609.344

@@ -133,7 +133,10 @@ struct JourneyMapView: View {
 
     private var completedCopy: String {
         if let name = finalWaypointName {
-            return "Journey complete — Wren is resting at \(name)."
+            // KAN-33 Ruling 5 & 10: the character name reads from the ONE seam so
+            // the banner and the journey_complete notification never diverge and
+            // both swap in one place when character selection ships.
+            return "Journey complete — \(JourneyCharacter.currentName) is resting at \(name)."
         }
         return "Journey complete."
     }

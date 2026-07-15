@@ -54,6 +54,11 @@ enum ProgressUpdater {
 
         let delta = max(0, newCumulative - anchor.lastProcessedDistance)
 
+        // KAN-33: the at-most-one-per-journey milestone requests this delta earns,
+        // accumulated across active journeys and fired ONCE after save succeeds
+        // (Ruling 6). All Sendable values — never a @Model crosses `enqueue`.
+        var notificationRequests: [MilestoneNotificationRequest] = []
+
         // Monotonic anchor (Jake's ruling — see the delta-computation paragraph
         // in JourneyTracker_App_Concept.md): advance `lastProcessedDistance` and
         // credit journeys ONLY when the cumulative total genuinely grew. A
@@ -75,6 +80,7 @@ enum ProgressUpdater {
                 // it (it simply keeps accruing until it gains a template). A
                 // non-positive total (missing/zero content) must NOT auto-flip
                 // to completed at zero distance, so require total > 0.
+                var didCompleteThisDelta = false
                 let total = journey.template?.totalDistance ?? .infinity
                 if total > 0 && journey.distanceAccumulated >= total {
                     journey.distanceAccumulated = total
@@ -83,20 +89,36 @@ enum ProgressUpdater {
                     // here at auto-complete (covers zero-waypoint completions
                     // that have no final-waypoint crossing to read).
                     journey.completedAt = date
+                    didCompleteThisDelta = true
                 }
 
                 // Ruling 2 & 4: record a WaypointCrossing for every waypoint in
                 // the half-open interval (old, new] with distanceFromStart > 0
                 // (origin waypoints are never crossings). `new` includes any
                 // completion clamp above. Idempotency-guarded so the same
-                // waypoint is never double-recorded across deltas.
-                recordCrossings(
+                // waypoint is never double-recorded across deltas. Returns ONLY
+                // the crossings newly inserted THIS delta — the notification
+                // decision reads exactly these (KAN-33 Ruling 3), never the whole
+                // history, so a replayed delta (no new crossings) notifies nothing.
+                let newlyCrossed = recordCrossings(
                     for: journey,
                     old: old,
                     new: journey.distanceAccumulated,
                     date: date,
                     in: context
                 )
+
+                // KAN-33 Ruling 2 & 6: collapse this journey's delta into AT MOST
+                // ONE request from Sendable snapshots (pure, in-memory — no await).
+                // Built here where the models are valid; fired only after save.
+                if let request = buildNotificationRequest(
+                    for: journey,
+                    didCompleteThisDelta: didCompleteThisDelta,
+                    newlyCrossed: newlyCrossed,
+                    now: date
+                ) {
+                    notificationRequests.append(request)
+                }
             }
             anchor.lastProcessedDistance = newCumulative
         }
@@ -106,7 +128,49 @@ enum ProgressUpdater {
         anchor.sourceDevice = sourceDevice
 
         try context.save()
+
+        // KAN-33 Ruling 6 & 9: fire ONCE, only AFTER the save that persisted these
+        // milestones succeeded — never describe a crossing/completion the store
+        // didn't commit. `enqueue` is the KAN-32 nonisolated, non-blocking
+        // primitive: it returns immediately (permission-gated, forward-only), so
+        // no `await` ever enters this delta transaction.
+        if !notificationRequests.isEmpty {
+            // The `nonisolated static` entry — no cross-actor reach for `shared`.
+            NotificationManager.enqueue(notificationRequests)
+        }
         return delta
+    }
+
+    /// Builds the single milestone request a journey earned in this delta, or nil
+    /// when the collapse rule fires nothing (Ruling 2) or the journey has no
+    /// authored sheet/content (graceful no-op, Ruling 4). Pure: reads the live
+    /// models to snapshot Sendable values and derives stats via the pure
+    /// JourneyStatsCalculator, then delegates the rule to MilestoneNotificationFactory.
+    nonisolated private static func buildNotificationRequest(
+        for journey: UserJourney,
+        didCompleteThisDelta: Bool,
+        newlyCrossed: [Waypoint],
+        now: Date
+    ) -> MilestoneNotificationRequest? {
+        let stats = JourneyStatsCalculator.stats(for: journey, now: now)
+        let crossed = newlyCrossed.map {
+            MilestoneNotificationFactory.CrossedWaypoint(
+                id: $0.id,
+                order: $0.order,
+                name: $0.name,
+                distanceFromStart: $0.distanceFromStart
+            )
+        }
+        return MilestoneNotificationFactory.request(
+            journeyName: journey.name,
+            userJourneyID: journey.id,
+            templateID: journey.template?.id,
+            didCompleteThisDelta: didCompleteThisDelta,
+            crossedThisDelta: crossed,
+            stats: stats,
+            distanceAccumulated: journey.distanceAccumulated,
+            totalDistance: journey.totalDistance
+        )
     }
 
     /// Inserts a `WaypointCrossing` for each of `journey`'s waypoints crossed in
@@ -120,15 +184,21 @@ enum ProgressUpdater {
     /// The crossing SNAPSHOTS the waypoint's identity (Ruling 1); it holds no
     /// live Waypoint relationship. `crossedAt` is the reading's `date` — several
     /// waypoints crossed by one delta legitimately share it.
+    ///
+    /// - Returns: the waypoints whose crossings were NEWLY inserted this delta
+    ///   (skipping any already recorded) — the exact set the KAN-33 notification
+    ///   decision reads. A replayed delta inserts nothing and returns `[]`.
+    @discardableResult
     nonisolated private static func recordCrossings(
         for journey: UserJourney,
         old: Double,
         new: Double,
         date: Date,
         in context: ModelContext
-    ) {
-        guard let waypoints = journey.template?.waypoints, !waypoints.isEmpty else { return }
+    ) -> [Waypoint] {
+        guard let waypoints = journey.template?.waypoints, !waypoints.isEmpty else { return [] }
         let alreadyRecorded = Set((journey.crossings ?? []).map { $0.waypointID })
+        var newlyCrossed: [Waypoint] = []
 
         for waypoint in waypoints where waypoint.distanceFromStart > 0 {
             let d = waypoint.distanceFromStart
@@ -144,6 +214,8 @@ enum ProgressUpdater {
                 journey: journey
             )
             context.insert(crossing)
+            newlyCrossed.append(waypoint)
         }
+        return newlyCrossed
     }
 }

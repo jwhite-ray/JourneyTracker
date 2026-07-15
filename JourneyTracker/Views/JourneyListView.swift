@@ -21,6 +21,11 @@ import SwiftData
 struct JourneyListView: View {
     @Query private var instances: [UserJourney]
 
+    /// KAN-33 Ruling 8: this view now owns the Journeys tab's path-based
+    /// NavigationStack, bound to the shared router's `path`, so a milestone-
+    /// notification tap can push a journey's map from outside the view tree.
+    @Environment(DeepLinkRouter.self) private var router
+
     /// Which card's kebab menu is open (by the shown instance's identity).
     @State private var openMenuID: PersistentIdentifier?
     /// The paused instance awaiting destructive restart confirmation.
@@ -53,31 +58,39 @@ struct JourneyListView: View {
     }
 
     var body: some View {
-        content
-            .background(Color(token: DesignToken.parchment))
-            .navigationTitle("Your Journeys")
-            // The `+` entry point to Available Journeys — always visible,
-            // populated or empty (KAN-11).
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { showingStore = true } label: {
-                        Image(systemName: "plus.circle")
-                            .font(.system(size: 22, weight: .semibold))
-                            .foregroundStyle(Color(token: DesignToken.ink))
+        @Bindable var router = router
+        NavigationStack(path: $router.path) {
+            content
+                .background(Color(token: DesignToken.parchment))
+                .navigationTitle("Your Journeys")
+                // The `+` entry point to Available Journeys — always visible,
+                // populated or empty (KAN-11).
+                .toolbar {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { showingStore = true } label: {
+                            Image(systemName: "plus.circle")
+                                .font(.system(size: 22, weight: .semibold))
+                                .foregroundStyle(Color(token: DesignToken.ink))
+                        }
+                        .accessibilityIdentifier("list.addJourneyButton")
+                        .accessibilityLabel("Available Journeys")
                     }
-                    .accessibilityIdentifier("list.addJourneyButton")
-                    .accessibilityLabel("Available Journeys")
                 }
-            }
-            // One shared destination, pushed onto the same NavigationStack that
-            // already pushes JourneyMapView. A successful start pops back here.
-            .navigationDestination(isPresented: $showingStore) {
-                AvailableJourneysView()
-            }
-            .overlayPreferenceValue(KebabAnchorKey.self) { anchors in
-                menuOverlay(anchors: anchors)
-            }
-            .overlay { confirmationOverlay }
+                // One shared destination, pushed onto this NavigationStack.
+                // A successful start pops back here.
+                .navigationDestination(isPresented: $showingStore) {
+                    AvailableJourneysView()
+                }
+                // KAN-33 Ruling 8: the value-based destination the card's "View
+                // Journey" link AND a notification-tap deep link both push onto.
+                .navigationDestination(for: UserJourney.self) { journey in
+                    JourneyMapView(journey: journey)
+                }
+                .overlayPreferenceValue(KebabAnchorKey.self) { anchors in
+                    menuOverlay(anchors: anchors)
+                }
+                .overlay { confirmationOverlay }
+        }
     }
 
     @ViewBuilder
@@ -289,11 +302,11 @@ private struct JourneyCard: View {
                     .accessibilityIdentifier("list.startDate.\(journey.name)")
 
                 HStack(spacing: 10) {
-                    NavigationLink {
-                        JourneyMapView(journey: journey)
-                    } label: {
-                        // Opens the "journey view" (the tab renamed per Justin's
-                        // 2026-07-12 two-surface ruling). Identifier kept stable.
+                    // KAN-33 Ruling 8: value-based push onto the router's path (the
+                    // same destination a notification-tap deep link drives). Opens
+                    // the "journey view" (renamed per Justin's 2026-07-12 two-surface
+                    // ruling). Identifier kept stable.
+                    NavigationLink(value: journey) {
                         StampButtonLabel(title: "View Journey", fillToken: journey.theme.accentColorToken)
                     }
                     .buttonStyle(.plain)

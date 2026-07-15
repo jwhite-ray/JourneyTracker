@@ -2,7 +2,9 @@
 
 One CSV per journey: the waypoint, its mileage, which notification hook fires, the message templates, and the artwork asset. **These files are the canonical source for notification copy** — open them in Numbers or Excel to view/edit, but save back as CSV (they live in git).
 
-Consumed by Phase 1 (KAN-33, milestone notifications); the `artwork_asset` column is consumed by the notification-artwork phase (KAN-34 epic).
+**Location: `JourneyTracker/Notifications/Content/*.csv`** (moved there in KAN-33 so the app bundles and reads them at runtime — one canonical copy, no drift). This `docs/notifications/` directory keeps only this README. Edit the CSVs at their new path; they're still plain CSV, Numbers/Excel-friendly, and diff cleanly in git.
+
+Consumed by Phase 1 (KAN-33, milestone notifications) via `NotificationContentProvider`, which fills the `{…}` placeholders at fire time; the `artwork_asset` column is consumed by the notification-artwork phase (KAN-39, Notifications v1 Phase 2).
 
 ## Columns
 
