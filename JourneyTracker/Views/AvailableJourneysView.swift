@@ -94,6 +94,12 @@ struct AvailableJourneysView: View {
         Task {
             do {
                 try await ProgressStore.shared.startJourney(templateID: id)
+                // KAN-32 Ruling 1: contextual notification permission, requested
+                // ONLY after a SUCCESSFUL start — self-gated on `.notDetermined`,
+                // so the first journey ever prompts exactly once and every later
+                // start/restart no-ops. A `.notStartable` failure (below) is NOT a
+                // first journey, so it never reaches here.
+                await NotificationManager.shared.requestAuthorizationOnFirstJourney()
                 dismiss()
             } catch ProgressStore.LifecycleError.notStartable {
                 dismiss()
