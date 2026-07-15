@@ -69,18 +69,18 @@ The design system was originally authored with placeholder names from a well-kno
 
 These numbers live in journey *data* (a bundled JSON file or SwiftData records), never as Swift literals in view code. The table above is the source they're seeded from, not a second copy to keep in sync by hand.
 
-**Journey 3 — "First Journey"** (KAN-7 test fixture) · `totalDistance` = 10 mi (16,093.44 m) · fantasy
+**Journey 3 — "First Journey"** (KAN-7 test fixture; faceted map KAN-40) · `totalDistance` = 10 mi (16,093.44 m) · fantasy
 
-A short, low-total journey seeded alongside the two starters so marker positioning and completion can be exercised without walking 1,800 miles. Waypoints at cumulative miles 1 / 3 / 7 / 9, plus start (0) and end (10). Original names, no real-world IP.
+A short, low-total journey seeded alongside the starters so marker positioning and completion can be exercised without walking 1,800 miles. As of KAN-40 its six waypoints and its map are authored through the KAN-23 hand-drawn-map pipeline from a real ~9.6-mi route (a Lehi-UT canyon-reservoir loop Justin rode), rescaled to the fixture's canonical **10 mi** and re-expressed in the §07 terrain vocabulary — a western faceted range, a canyon lake, the "Dry Creek" drainage, three city-park forests, and three settlements. Original names throughout (the real landmarks are swapped; no real-world IP). Waypoint mileages are trek-arc-derived, not round. First Journey now ships faceted map authoring (`FirstJourneyMap`) and renders via the faceted journey view (KAN-21) — it is **no longer** a pin-and-route fallback journey.
 
 | Order | Waypoint | Cumulative miles |
 |---|---|---|
-| 0 | Trailhead | 0 |
-| 1 | First Rest | 1 |
-| 2 | Willowbend | 3 |
-| 3 | Old Oak | 7 |
-| 4 | Lastlight Bridge | 9 |
-| 5 | Journey's End | 10 |
+| 0 | Fernhollow | 0 |
+| 1 | Mallow Bend | 1.94 |
+| 2 | Greenway Cross | 4.19 |
+| 3 | Fenwick Rise | 6.70 |
+| 4 | Rushmere | 8.54 |
+| 5 | Cragmouth Gate | 10 |
 
 **Journey 4 — "The Lantern Road"** (KAN-12) · `totalDistance` = 20 mi (32,186.88 m) · fantasy
 
@@ -125,16 +125,16 @@ The first journey authored through the KAN-23 hand-drawn-map pipeline: Justin dr
 | 6 | Whitewatch | 0.70 | 0.24 |
 | 7 | Ember Spire | 0.82 | 0.12 |
 
-*First Journey:*
+*First Journey:* As of KAN-40 these are no longer eyeballed placeholders — like the Windrise entry they derive directly from the authored map-unit space. `FirstJourneyMap` uses a **1000×680** map-unit bounds (origin top-left) at a trek-arc-anchored scale of ≈**88 map units per mile** (10 mi over the smoothed trek's ~878-unit arc). Normalized seed positions are `positionX = x / 1000`, `positionY = y / 680`, and are what `SeedData` ships.
 
 | Order | Waypoint | positionX | positionY |
 |---|---|---|---|
-| 0 | Trailhead | 0.15 | 0.85 |
-| 1 | First Rest | 0.30 | 0.72 |
-| 2 | Willowbend | 0.45 | 0.60 |
-| 3 | Old Oak | 0.60 | 0.42 |
-| 4 | Lastlight Bridge | 0.75 | 0.28 |
-| 5 | Journey's End | 0.88 | 0.14 |
+| 0 | Fernhollow | 0.3000 | 0.8000 |
+| 1 | Mallow Bend | 0.4600 | 0.8600 |
+| 2 | Greenway Cross | 0.6300 | 0.7300 |
+| 3 | Fenwick Rise | 0.8000 | 0.5400 |
+| 4 | Rushmere | 0.7100 | 0.3500 |
+| 5 | Cragmouth Gate | 0.6350 | 0.2050 |
 
 *The Lantern Road:*
 
