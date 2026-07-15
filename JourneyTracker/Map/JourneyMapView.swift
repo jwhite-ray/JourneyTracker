@@ -11,13 +11,13 @@
 //
 //  TWO map surfaces, chosen by whether the journey has authored faceted content
 //  (KAN-21):
-//   • WITH authoring (Road to The Windrise Peaks) — the map card renders the calm,
+//   • WITH authoring (Road to The Windrise Peaks / First Journey) — the map card renders the calm,
 //     static `StaticJourneyMapView` at chapter framing over the faceted terrain,
 //     with an expand button to the gesture-driven `FullScreenMapView`. The marker
 //     mileage and the waypoint pin states are derived from REAL progress each
 //     render; the heavy scene + geometry cache is built ONCE per appearance.
-//   • WITHOUT authoring (Ember Spire / First Journey / Lantern Road / Around the
-//     World) — the KAN-7 pin-and-route fallback: parchment field, dot-dash ink
+//   • WITHOUT authoring (Ember Spire / Lantern Road / Around the World) — the
+//     KAN-7 pin-and-route fallback: parchment field, dot-dash ink
 //     route, Wren interpolated by real distance. Its waypoint pins now render the
 //     SAME §07 teardrop/chip anatomy the faceted Canvas uses (KAN-21 mid-flight),
 //     via the shared `TerrainRenderer.drawPins`, so both surfaces read as one

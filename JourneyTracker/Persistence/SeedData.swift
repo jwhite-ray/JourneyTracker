@@ -70,6 +70,11 @@ enum SeedData {
                 ("Ember Spire",    1800, 0.82, 0.12),
             ]
         ),
+        // KAN-40: First Journey now carries a faceted authored map (FirstJourneyMap),
+        // so its catalog waypoints match that map's control points. Positions are the
+        // FirstJourneyMap source pixels (1000×680) normalized to the map bounds —
+        // x/1000, y/680. Miles are the validator-confirmed anchor mileages. Names are
+        // originals (no real-world IP). Its faceted authoring lives in FirstJourneyMap.
         TemplateSeed(
             name: firstJourneyName,
             type: .fantasy,
@@ -79,12 +84,12 @@ enum SeedData {
             accentColorToken: "accent/secondary",
             pathColorToken: "ink",
             waypoints: [
-                ("Trailhead",         0,  0.15, 0.85),
-                ("First Rest",        1,  0.30, 0.72),
-                ("Willowbend",        3,  0.45, 0.60),
-                ("Old Oak",           7,  0.60, 0.42),
-                ("Lastlight Bridge",  9,  0.75, 0.28),
-                ("Journey's End",     10, 0.88, 0.14),
+                ("Fernhollow",      0,    300.0 / 1000, 544.0 / 680),
+                ("Mallow Bend",     1.94, 460.0 / 1000, 585.0 / 680),
+                ("Greenway Cross",  4.19, 630.0 / 1000, 496.0 / 680),
+                ("Fenwick Rise",    6.70, 800.0 / 1000, 367.0 / 680),
+                ("Rushmere",        8.54, 710.0 / 1000, 238.0 / 680),
+                ("Cragmouth Gate",  10,   635.0 / 1000, 139.0 / 680),
             ]
         ),
         TemplateSeed(
@@ -237,6 +242,41 @@ enum SeedData {
             let entry = seed.waypoints[waypoint.order]
             waypoint.positionX = entry.x
             waypoint.positionY = entry.y
+        }
+
+        // KAN-40: self-healing First-Journey waypoint reconciliation. First Journey's
+        // waypoints were re-authored (new names/miles/positions to match the faceted
+        // FirstJourneyMap). The (0,0) position sentinel above CANNOT catch this — the
+        // old waypoints have real, non-zero coordinates — so a store that already
+        // seeded the old six (every existing dev/QA sim) would keep stale
+        // names/miles in `template.waypoints`, silently desyncing crossings,
+        // JourneyStatsCalculator, leg labels, and notification-content lookup (which
+        // keys on the NEW names) from the correct faceted MapAuthoring.
+        //
+        // Fix in place, scoped to First Journey only: the old→new mapping is 1:1 by
+        // `order` (6→6), so we rewrite each waypoint's name / distanceFromStart /
+        // positionX / positionY to the seed values — no row insert/delete, no schema
+        // change, no store migration. Idempotent: once rewritten the fields match the
+        // seed, so `needsReconcile` is false and this is a no-op on every later launch.
+        //
+        // Existing `WaypointCrossing` snapshots are historical and are intentionally
+        // NOT rewritten here; they degrade gracefully under KAN-14's "date not
+        // recorded" rules, which is acceptable.
+        guard template.name == firstJourneyName else { return }
+        for waypoint in waypoints {
+            guard waypoint.order < seed.waypoints.count else { continue }
+            let entry = seed.waypoints[waypoint.order]
+            let expectedMeters = entry.miles * metersPerMile
+            let needsReconcile = waypoint.name != entry.name
+                || abs(waypoint.distanceFromStart - expectedMeters) > 0.5
+                || waypoint.positionX != entry.x
+                || waypoint.positionY != entry.y
+            if needsReconcile {
+                waypoint.name = entry.name
+                waypoint.distanceFromStart = expectedMeters
+                waypoint.positionX = entry.x
+                waypoint.positionY = entry.y
+            }
         }
     }
 
