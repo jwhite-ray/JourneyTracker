@@ -11,7 +11,7 @@
 //  callers keep asking `authoring(for:)` and never change.
 //
 //  A journey WITHOUT an entry here has no faceted map and renders the KAN-7
-//  pin-and-route fallback (Ember Spire / Lantern Road / Around the World). The
+//  pin-and-route fallback (Around the World). The
 //  lookup returns the same frozen `MapAuthoring` value on every call —
 //  the map is a pure function of (regions, seed), identical for every user.
 //

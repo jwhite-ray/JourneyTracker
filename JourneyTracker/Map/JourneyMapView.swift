@@ -16,7 +16,7 @@
 //     with an expand button to the gesture-driven `FullScreenMapView`. The marker
 //     mileage and the waypoint pin states are derived from REAL progress each
 //     render; the heavy scene + geometry cache is built ONCE per appearance.
-//   • WITHOUT authoring (Ember Spire / Lantern Road / Around the World) — the
+//   • WITHOUT authoring (Around the World) — the
 //     KAN-7 pin-and-route fallback: parchment field, dot-dash ink
 //     route, Wren interpolated by real distance. Its waypoint pins now render the
 //     SAME §07 teardrop/chip anatomy the faceted Canvas uses (KAN-21 mid-flight),

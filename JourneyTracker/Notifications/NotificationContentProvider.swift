@@ -66,9 +66,7 @@ nonisolated enum NotificationContentProvider {
     /// derivation of the name, so it lives here rather than being computed. A
     /// journey absent from this map has no sheet and notifies nothing.
     private static let slugByJourneyName: [String: String] = [
-        "The Road to Ember Spire": "ember-spire",
         "First Journey": "first-journey",
-        "The Lantern Road": "lantern-road",
         "Road to The Windrise Peaks": "windrise-peaks",
         "Around the World": "around-the-world",
     ]

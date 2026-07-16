@@ -28,11 +28,20 @@ enum SeedData {
     /// never re-hardcoded here.
     private static let metersPerMile = DistanceFormatter.metersPerMile
 
-    private static let emberSpireName = "The Road to Ember Spire"
     private static let firstJourneyName = "First Journey"
     private static let aroundTheWorldName = "Around the World"
-    private static let lanternRoadName = "The Lantern Road"
     private static let windrisePeaksName = "Road to The Windrise Peaks"
+
+    /// Journeys retired from the catalog (KAN-45) but preserved for a future
+    /// return — their full seed tables and notification sheets live in
+    /// `docs/archive/`. Seeding DELETES any template still carrying one of
+    /// these names (instances explicitly, since `JourneyTemplate.instances`
+    /// has no cascade rule; waypoints cascade with the template), so an
+    /// upgraded install drops them the same as a fresh one.
+    private static let retiredTemplateNames: Set<String> = [
+        "The Road to Ember Spire",
+        "The Lantern Road",
+    ]
 
     /// A canonical template definition, seeded idempotently by name.
     private struct TemplateSeed {
@@ -51,25 +60,6 @@ enum SeedData {
     /// World" is intentionally themeless (empty image names, default accent/
     /// path) and has no mapped route.
     private static let catalog: [TemplateSeed] = [
-        TemplateSeed(
-            name: emberSpireName,
-            type: .fantasy,
-            totalMiles: 1_800,
-            backgroundImageName: "ember_spire_bg",
-            markerImageName: "marker_wren",
-            accentColorToken: "accent/primary",
-            pathColorToken: "ink",
-            waypoints: [
-                ("Thistledown",    0,    0.12, 0.88),
-                ("Crosswater",     120,  0.28, 0.78),
-                ("Silvergate",     460,  0.20, 0.60),
-                ("The Deepdelve",  660,  0.40, 0.52),
-                ("Whisperwood",    720,  0.58, 0.55),
-                ("The Windmark",   1040, 0.52, 0.38),
-                ("Whitewatch",     1540, 0.70, 0.24),
-                ("Ember Spire",    1800, 0.82, 0.12),
-            ]
-        ),
         // KAN-40: First Journey now carries a faceted authored map (FirstJourneyMap),
         // so its catalog waypoints match that map's control points. Positions are the
         // FirstJourneyMap source pixels (1000×680) normalized to the map bounds —
@@ -90,21 +80,6 @@ enum SeedData {
                 ("Fenwick Rise",    6.70, 800.0 / 1000, 367.0 / 680),
                 ("Rushmere",        8.54, 710.0 / 1000, 238.0 / 680),
                 ("Cragmouth Gate",  10,   635.0 / 1000, 139.0 / 680),
-            ]
-        ),
-        TemplateSeed(
-            name: lanternRoadName,
-            type: .fantasy,
-            totalMiles: 20,
-            backgroundImageName: "lantern_road_bg",
-            markerImageName: "marker_wren",
-            accentColorToken: "accent/secondary",
-            pathColorToken: "ink",
-            waypoints: [
-                ("Wickgate",         0,  0.14, 0.86),
-                ("Foglow Bridge",    3,  0.24, 0.76),
-                ("Palefire Hollow",  17, 0.74, 0.26),
-                ("Lanternrest",      20, 0.86, 0.14),
             ]
         ),
         // KAN-23: the first hand-drawn-map journey. The catalog record here drives
@@ -161,6 +136,19 @@ enum SeedData {
         } catch {
             print("[SeedData] Existence check failed; aborting seed to avoid duplicates: \(error)")
             return
+        }
+
+        // MARK: - Retired templates (KAN-45) — removed BEFORE the catalog is
+        // ensured, so a retired name can never be re-inserted by a stale seed.
+        // Deleting a template is otherwise not a user flow (JourneyTemplate.swift);
+        // this seed-time pass is the one sanctioned exception.
+        for template in existingTemplates where retiredTemplateNames.contains(template.name) {
+            // Instances do NOT cascade from the template — delete them
+            // explicitly (their crossings cascade via UserJourney.crossings).
+            for instance in template.instances ?? [] {
+                context.delete(instance)
+            }
+            context.delete(template)
         }
 
         // MARK: - Templates — always ensured idempotently, by name.
