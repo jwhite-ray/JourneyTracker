@@ -39,10 +39,33 @@ struct AvailableJourneysView: View {
     /// display state. The authoritative predicate is re-checked in ProgressStore.
     @Query private var instances: [UserJourney]
 
+    /// Drives the KAN-42 pre-permission priming sheet. Set true only after a
+    /// FIRST successful start (authorization still `.notDetermined`); the store
+    /// pop-back is deferred until the sheet is torn down (see `onDismiss`).
+    @State private var showPriming = false
+
     var body: some View {
         content
             .background(Color(token: DesignToken.parchment))
             .navigationTitle("Available Journeys")
+            // The priming modal over the store page (KAN-42 Ruling 4): a `.sheet`
+            // at a compact half-height detent. `onDismiss` pops the store back to
+            // "Your Journeys" for EVERY exit — Enable, "Not now", AND swipe — so
+            // swipe is identical to "Not now". Only Enable calls the system
+            // request first; every other path is a true no-op on authorization.
+            .sheet(isPresented: $showPriming, onDismiss: { dismiss() }) {
+                NotificationPrimingView(
+                    onEnable: {
+                        Task {
+                            await NotificationManager.shared.requestAuthorizationOnFirstJourney()
+                            showPriming = false
+                        }
+                    },
+                    onNotNow: { showPriming = false }
+                )
+                .presentationDetents([.height(360), .medium])
+                .presentationDragIndicator(.hidden)
+            }
     }
 
     @ViewBuilder
@@ -94,13 +117,19 @@ struct AvailableJourneysView: View {
         Task {
             do {
                 try await ProgressStore.shared.startJourney(templateID: id)
-                // KAN-32 Ruling 1: contextual notification permission, requested
-                // ONLY after a SUCCESSFUL start — self-gated on `.notDetermined`,
-                // so the first journey ever prompts exactly once and every later
-                // start/restart no-ops. A `.notStartable` failure (below) is NOT a
-                // first journey, so it never reaches here.
-                await NotificationManager.shared.requestAuthorizationOnFirstJourney()
-                dismiss()
+                // KAN-42: the KAN-32 Ruling-1 contextual request is now FRONTED
+                // by our own priming screen. On the FIRST journey ever
+                // (authorization still `.notDetermined`) we present the priming
+                // sheet — and DO NOT call the system request or pop back yet;
+                // Enable/Not-now/swipe drive both from the sheet. Every later
+                // start/restart sees a determined status: no priming, pop back as
+                // before. A `.notStartable` failure (below) is NOT a first
+                // journey, so it never reaches here and never primes.
+                if NotificationManager.shared.authorization == .notDetermined {
+                    showPriming = true
+                } else {
+                    dismiss()
+                }
             } catch ProgressStore.LifecycleError.notStartable {
                 dismiss()
             } catch {
