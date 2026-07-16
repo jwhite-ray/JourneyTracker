@@ -1,0 +1,8 @@
+hook,order,waypoint,cumulative_miles,title_template,body_template,artwork_asset,notes
+waypoint_reached,1,Wayllabamba,7.46,{character} reached Wayllabamba,"The last village before the climb. The great pass at Warmiwañusca rises {miles_to_next} ahead.",,
+waypoint_reached,2,Warmiwañusca (Dead Woman's Pass),11.81,Dead Woman's Pass crossed,"The highest ground of the trail is behind {character}. Pacaymayo lies {miles_to_next} down the far side.",,
+waypoint_reached,3,Pacaymayo,13.67,{character} reached Pacaymayo,"A camp beside the stream below the pass. Chaquicocha waits {miles_to_next} on.",,
+waypoint_reached,4,Chaquicocha,17.40,Chaquicocha reached,"Into the cloud forest, the ridges wrapped in mist. Wiñay Wayna lies {miles_to_next} ahead.",,
+waypoint_reached,5,Wiñay Wayna,23.61,{character} reached Wiñay Wayna,"Terraces spill down the green canyon wall. The Sun Gate stands {miles_to_next} beyond.",,
+waypoint_reached,6,Inti Punku (Sun Gate),25.48,Inti Punku reached,"{character} steps through the Sun Gate and the citadel comes into view. Just {miles_remaining} remain.",,
+journey_complete,7,Machu Picchu,26.72,Machu Picchu!,"{character} arrives at the stone citadel above the clouds — {total_miles} walked from Km 82.",,
