@@ -50,9 +50,13 @@ So, concretely:
 
 **Decided.** Journeys, characters, waypoints, color token display names, and UI copy use original names only. Nothing may be lifted from an existing book, film, or game — most pointedly, no Tolkien proper nouns. The fantasy *style* (parchment, faceted figures, a long walk to a volcano) is ours to use; the *names* are not.
 
+**Scope clarification (KAN-43/KAN-44, Jake).** The rule targets **fictional intellectual property** — invented proper nouns from books, films, games. It does **not** forbid **authentic real-world geography**. A `realWorld` journey (a real trail, "Around the World") is *supposed* to use the actual place names of the route it represents — that authenticity is the whole point of the type. So real trail, mountain, pass, and settlement names — including non-English and Indigenous names (e.g. Icelandic **Þórsmörk**, Quechua **Warmiwañusca**, **Wiñay Wayna**, and **Machu Picchu**) — are correct and required for real-world journeys, and are not "real-world IP" in the sense this rule guards against. Diacritics and non-ASCII characters are preserved verbatim (UTF-8) end-to-end: `Waypoint.name`, `DistanceFormatter`, and the notification CSV parser are all UTF-8-clean. *Font glyph coverage for those characters (e.g. the thorn Þ) is a Design System concern — Jeff confirms the map-label and notification-title faces render them.* Fantasy journeys remain original-names-only, unchanged.
+
 The design system was originally authored with placeholder names from a well-known source. Those have been replaced throughout. Canonical names live here:
 
-**Journey 1 — "The Road to Ember Spire"** · `totalDistance` = 1,800 mi (2,896,819 m)
+**Journey 1 — "The Road to Ember Spire"** · `totalDistance` = 1,800 mi (2,896,819 m) · **ARCHIVED (KAN-45, 2026-07-16)**
+
+> **Archived (KAN-45, 2026-07-16).** Retired from the live catalog at Justin's request — no longer seeded; seeding actively deletes any existing template (and its instances) by name. The full seed table, notification sheet, and a restore checklist live in `docs/archive/retired-journeys.md`. Archival supersedes the day-to-day KAN-25 identity question below, which resumes if/when this journey returns.
 
 > **Identity under review (KAN-25, 2026-07-13).** After copyright concerns, this journey's narrative identity — its name, waypoints, and theme — is being rethought, because its shape sits close to well-known fictional territory. The entry stays **functional** meanwhile (seeded, startable, renders via the KAN-7 pin-and-route fallback); its faceted-map authoring is deferred until KAN-25 resettles the identity, then goes through the KAN-23 hand-drawn pipeline (see the fantasy-map P4 note). Treat the names below as provisional until KAN-25 lands.
 
@@ -82,7 +86,9 @@ A short, low-total journey seeded alongside the starters so marker positioning a
 | 4 | Rushmere | 8.54 |
 | 5 | Cragmouth Gate | 10 |
 
-**Journey 4 — "The Lantern Road"** (KAN-12) · `totalDistance` = 20 mi (32,186.88 m) · fantasy
+**Journey 4 — "The Lantern Road"** (KAN-12) · `totalDistance` = 20 mi (32,186.88 m) · fantasy · **ARCHIVED (KAN-45, 2026-07-16)**
+
+> **Archived (KAN-45, 2026-07-16).** Retired from the live catalog at Justin's request — no longer seeded; seeding actively deletes any existing template (and its instances) by name. The full seed table, notification sheet, and a restore checklist live in `docs/archive/retired-journeys.md`.
 
 A mid-length journey with deliberately uneven waypoint spacing (3-mile and 14-mile segments) so interpolation is exercised across long gaps. Original names, no real-world IP. Accent: `accent/secondary`.
 
@@ -109,6 +115,43 @@ The first journey authored through the KAN-23 hand-drawn-map pipeline: Justin dr
 | 7 | Stonewash Ford | 218.8 |
 | 8 | Rivergate | 227.7 |
 | 9 | The Windrise Peaks | 302.4 |
+
+**Journey 6 — "Laugavegur Trail"** (KAN-43) · `totalDistance` = 34.18 mi (55 km) · **realWorld** · *Decided, not yet built*
+
+**Journey 7 — "Inca Trail"** (KAN-44) · `totalDistance` = 26.72 mi (43 km) · **realWorld** · *Decided, not yet built*
+
+These are the **first *mapped* `realWorld` journeys** (Around the World is `realWorld` but themeless and waypointless). Two rulings frame them:
+
+- **`JourneyType.realWorld` carries no branching behavior in code today** — verified: nothing switches on `type`; the journey view branches on `MapAuthoringCatalog.hasAuthoring(template)`, not on `type`, and the stats/crossing/notification layers are all type-agnostic. So a mapped `realWorld` journey with waypoints but no faceted authoring renders through the **KAN-7 pin-and-route fallback** exactly like an unauthored fantasy journey, with zero code change. The fallback is therefore now load-bearing for `realWorld` journeys, not only for unauthored fantasy ones.
+- **They launch on pin-and-route, not faceted terrain and not MapKit.** The faceted cartography system is explicitly the *custom fantasy* renderer; authoring a real Icelandic/Peruvian trail as invented faceted terrain would misrepresent real geography and cut against the "`realWorld` → MapKit when built" plan (see the fantasy-map section and the Journey types row). The MapKit real-world visualization remains **Decided, not built** and is out of scope for "add a journey." These two ship as pin-and-route now; a real-world MapKit surface, if built later, is its own ticket and would upgrade both without touching their seed data.
+
+Distances convert km → mi at 1 km = 0.621371 mi (stored in meters via `DistanceFormatter.metersPerMile`, as `SeedData` does). Names are authentic geography per the scope clarification above.
+
+*Laugavegur Trail* (source: Ferðafélag Íslands). 6 waypoints:
+
+| Order | Waypoint | Cumulative miles | (km) |
+|---|---|---|---|
+| 0 | Landmannalaugar | 0 | 0 |
+| 1 | Hrafntinnusker | 7.46 | 12 |
+| 2 | Álftavatn | 14.91 | 24 |
+| 3 | Hvanngil | 17.40 | 28 |
+| 4 | Emstrur (Botnar) | 24.23 | 39 |
+| 5 | Þórsmörk | 34.18 | 55 |
+
+*Inca Trail* (classic 4-day route). 8 waypoints:
+
+| Order | Waypoint | Cumulative miles | (km) |
+|---|---|---|---|
+| 0 | Km 82 (Piscacucho) | 0 | 0 |
+| 1 | Wayllabamba | 7.46 | 12 |
+| 2 | Warmiwañusca (Dead Woman's Pass) | 11.81 | 19 |
+| 3 | Pacaymayo | 13.67 | 22 |
+| 4 | Chaquicocha (Sayacmarca) | 17.40 | 28 |
+| 5 | Wiñay Wayna | 23.61 | 38 |
+| 6 | Inti Punku (Sun Gate) | 25.48 | 41 |
+| 7 | Machu Picchu | 26.72 | 43 |
+
+**Pin positions** for both are placeholder pin-and-route layout (distinct, non-colliding, roughly tracking `distanceFromStart`), finalized by Jeff against the chosen background art — exactly the Ember Spire precedent. Provisional seed values are in the PRD; Jeff's finalized values supersede them.
 
 **Waypoint map positions (KAN-7).** `positionX`/`positionY` are image-relative normalized coordinates (0…1, origin top-left). These were all `0` in the shipped seed; KAN-7 seeds real placeholder values so the marker interpolation and pin layout can be verified. Exact values are placeholder art (Jeff finalizes against real backgrounds later); the requirement is only that they are distinct, non-colliding, and roughly track `distanceFromStart` so segment interpolation looks natural.
 

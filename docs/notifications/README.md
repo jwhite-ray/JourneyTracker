@@ -36,6 +36,6 @@ All numbers are formatted by `DistanceFormatter` at fire time — never write li
 - **Past tense only** ("has reached", never "is arriving") — HealthKit background delivery can lag minutes to hours.
 - **0-mile origin waypoints never notify** (KAN-14 Ruling 4) — they have no row here.
 - **Original IP only** — copy and artwork alike (no real-world/franchise names).
-- **Ember Spire's sheet is provisional** — its identity is being rethought under KAN-25; don't polish that copy until KAN-25 lands.
+- **Ember Spire and Lantern Road are archived (KAN-45)** — their sheets moved to `docs/archive/` and are no longer bundled. If Ember Spire returns, its copy stays provisional under KAN-25 until that identity rethink lands.
 - **Every journey eventually gets waypoint rows.** A journey's development is complete only when it has waypoints, a map, and notification content (ruling 2026-07-14). Around the World's sheet carries only percent/complete rows *today* because its waypoints aren't authored yet — `waypoint_reached` rows get added when they are.
 - Artwork must read at **thumbnail size** (collapsed notifications show a small square on the right); the expanded view shows it near full-width.
