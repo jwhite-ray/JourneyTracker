@@ -25,7 +25,9 @@ enum MapAuthoringCatalog {
     /// the frozen authoring input is shared by every screen that renders it.
     private static let authoringByTemplateName: [String: MapAuthoring] = [
         "Road to The Windrise Peaks": WindrisePeaksMap.make(),
-        "First Journey": FirstJourneyMap.make()
+        "First Journey": FirstJourneyMap.make(),
+        "Laugavegur Trail": LaugavegurMap.make(),
+        "Inca Trail": IncaTrailMap.make()
     ]
 
     /// The faceted authoring for a template, or `nil` when the journey has none

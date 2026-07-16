@@ -31,6 +31,8 @@ enum SeedData {
     private static let firstJourneyName = "First Journey"
     private static let aroundTheWorldName = "Around the World"
     private static let windrisePeaksName = "Road to The Windrise Peaks"
+    private static let laugavegurName = "Laugavegur Trail"
+    private static let incaTrailName = "Inca Trail"
 
     /// Journeys retired from the catalog (KAN-45) but preserved for a future
     /// return — their full seed tables and notification sheets live in
@@ -106,6 +108,56 @@ enum SeedData {
                 ("Stonewash Ford",      218.8, 1041.0 / 1190, 557.0 / 896),
                 ("Rivergate",           227.7, 1090.0 / 1190, 520.0 / 896),
                 ("The Windrise Peaks",  302.4, 1085.0 / 1190, 42.0 / 896),
+            ]
+        ),
+        // KAN-43: the first real-world authored-map journey. Its catalog record
+        // drives "Available Journeys" and the KAN-7 journey screen (normalized 0…1
+        // pin positions); its faceted map authoring lives in `LaugavegurMap`. The
+        // six waypoint positions are the map authoring's exact snapped pixels
+        // (900×1240) normalized to the map bounds — x/900, y/1240. Names are
+        // authentic Icelandic geography (App Concept doc scope clarification), not
+        // IP, and match LaugavegurMap's waypoint names verbatim (notification lookup
+        // and crossings key on them, incl. Þórsmörk's thorn and Álftavatn).
+        TemplateSeed(
+            name: laugavegurName,
+            type: .realWorld,
+            totalMiles: 34.18,
+            backgroundImageName: "laugavegur_bg",
+            markerImageName: "marker_wren",
+            accentColorToken: "accent/primary",
+            pathColorToken: "ink",
+            waypoints: [
+                ("Landmannalaugar",  0,     640.0 / 900, 110.0 / 1240),
+                ("Hrafntinnusker",   7.46,  520.0 / 900, 299.0 / 1240),
+                ("Álftavatn",        14.91, 472.0 / 900, 521.0 / 1240),
+                ("Hvanngil",         17.40, 475.0 / 900, 597.0 / 1240),
+                ("Emstrur (Botnar)", 24.23, 411.0 / 900, 793.0 / 1240),
+                ("Þórsmörk",         34.18, 330.0 / 900, 1085.0 / 1240),
+            ]
+        ),
+        // KAN-44: the second real-world authored-map journey. Its faceted map
+        // authoring lives in `IncaTrailMap`. The eight waypoint positions are the
+        // map authoring's exact snapped pixels (1200×800) normalized to the map
+        // bounds — x/1200, y/800. Names are authentic Peruvian/Quechua geography,
+        // not IP, and match IncaTrailMap's waypoint names verbatim (notification
+        // lookup and crossings key on them, incl. Warmiwañusca and Wiñay Wayna).
+        TemplateSeed(
+            name: incaTrailName,
+            type: .realWorld,
+            totalMiles: 26.72,
+            backgroundImageName: "inca_trail_bg",
+            markerImageName: "marker_wren",
+            accentColorToken: "accent/secondary",
+            pathColorToken: "ink",
+            waypoints: [
+                ("Km 82 (Piscacucho)",               0,     1085.0 / 1200, 300.0 / 800),
+                ("Wayllabamba",                      7.46,  952.0 / 1200,  507.0 / 800),
+                ("Warmiwañusca (Dead Woman's Pass)", 11.81, 792.0 / 1200,  425.0 / 800),
+                ("Pacaymayo",                        13.67, 730.0 / 1200,  379.0 / 800),
+                ("Chaquicocha",                      17.40, 611.0 / 1200,  388.0 / 800),
+                ("Wiñay Wayna",                      23.61, 410.0 / 1200,  303.0 / 800),
+                ("Inti Punku (Sun Gate)",            25.48, 347.0 / 1200,  348.0 / 800),
+                ("Machu Picchu",                     26.72, 300.0 / 1200,  368.0 / 800),
             ]
         ),
         TemplateSeed(

@@ -4,7 +4,7 @@
 
 ## What the app is
 
-JourneyTracker turns everyday walking into visible progress along a chosen journey. The user picks a route — either a real-world distance (a marathon, "around the world," a specific trail) or an illustrated fantasy path (the road to Ember Spire, and eventually more) — and their real distance, read from Apple Health, moves a marker along that route over time. No app needs to be open for progress to accumulate; it happens passively in the background, on iPhone and eventually Apple Watch.
+JourneyTracker turns everyday walking into visible progress along a chosen journey. The user picks a route — either a real-world distance (a marathon, "around the world," a specific trail) or an illustrated fantasy path (the Road to The Windrise Peaks, and eventually more) — and their real distance, read from Apple Health, moves a marker along that route over time. No app needs to be open for progress to accumulate; it happens passively in the background, on iPhone and eventually Apple Watch.
 
 ## Document precedence
 
@@ -116,16 +116,19 @@ The first journey authored through the KAN-23 hand-drawn-map pipeline: Justin dr
 | 8 | Rivergate | 227.7 |
 | 9 | The Windrise Peaks | 302.4 |
 
-**Journey 6 — "Laugavegur Trail"** (KAN-43) · `totalDistance` = 34.18 mi (55 km) · **realWorld** · *Decided, not yet built*
+**Journey 6 — "Laugavegur Trail"** (KAN-43) · `totalDistance` = 34.18 mi (55 km) · **realWorld** · *Built (KAN-43) — `LaugavegurMap`*
 
-**Journey 7 — "Inca Trail"** (KAN-44) · `totalDistance` = 26.72 mi (43 km) · **realWorld** · *Decided, not yet built*
+**Journey 7 — "Inca Trail"** (KAN-44) · `totalDistance` = 26.72 mi (43 km) · **realWorld** · *Built (KAN-44) — `IncaTrailMap`*
 
-These are the **first *mapped* `realWorld` journeys** (Around the World is `realWorld` but themeless and waypointless). Two rulings frame them:
+These are the **first *mapped* `realWorld` journeys** (Around the World is `realWorld` but themeless and waypointless). The rulings that frame them:
 
-- **`JourneyType.realWorld` carries no branching behavior in code today** — verified: nothing switches on `type`; the journey view branches on `MapAuthoringCatalog.hasAuthoring(template)`, not on `type`, and the stats/crossing/notification layers are all type-agnostic. So a mapped `realWorld` journey with waypoints but no faceted authoring renders through the **KAN-7 pin-and-route fallback** exactly like an unauthored fantasy journey, with zero code change. The fallback is therefore now load-bearing for `realWorld` journeys, not only for unauthored fantasy ones.
-- **They launch on pin-and-route, not faceted terrain and not MapKit.** The faceted cartography system is explicitly the *custom fantasy* renderer; authoring a real Icelandic/Peruvian trail as invented faceted terrain would misrepresent real geography and cut against the "`realWorld` → MapKit when built" plan (see the fantasy-map section and the Journey types row). The MapKit real-world visualization remains **Decided, not built** and is out of scope for "add a journey." These two ship as pin-and-route now; a real-world MapKit surface, if built later, is its own ticket and would upgrade both without touching their seed data.
+- **`JourneyType.realWorld` carries no branching behavior in code** — verified: nothing switches on `type`; the journey view branches on `MapAuthoringCatalog.hasAuthoring(template)`, not on `type`, and the stats/crossing/notification layers are all type-agnostic. So these render through the faceted terrain surface purely because authoring exists for them, with zero type-specific code.
+- **Standing product ruling (Justin, KAN-43/44 Design Review, 2026-07-16): every journey gets its own authored faceted map in our styling.** At the gate Justin overruled the earlier PRD ruling that these would launch on pin-and-route. Both **ship with authored faceted maps** — `LaugavegurMap` and `IncaTrailMap`, registered in `MapAuthoringCatalog` by template name alongside `WindrisePeaksMap`/`FirstJourneyMap`, `MapValidator`-clean and user-approved through the KAN-23 pipeline (Laugavegur went two rounds — round 2 matches Justin's real reference map, the Mýrdalsjökull ice cap the dominant lower-right mass). Real geography is honored by authoring it faithfully in our facet vocabulary, not by deferring to a raster map service. **The earlier "`realWorld` → MapKit real-world visualization when built" plan is dropped for now** — a real-world MapKit surface is no longer a pending/deferred decision; if it ever returns it is a *new* decision, not a plan on the books.
+- **Waypoint positions are the authored map's samples, not eyeballed placeholders.** `positionX`/`positionY` for both derive from each map's authored trek polyline in map-unit space — the validator-snapped, anchor-exact samples the trek passes through at each waypoint's `distanceFromStart` (Laugavegur's anchor tolerance ≈ ±1.7 mi), exactly like Windrise/First Journey. Jeff no longer finalizes pin art against a background raster; the authored map *is* the surface.
 
 Distances convert km → mi at 1 km = 0.621371 mi (stored in meters via `DistanceFormatter.metersPerMile`, as `SeedData` does). Names are authentic geography per the scope clarification above.
+
+**Open Design System question for Jeff — a `glacier` region kind.** The Mýrdalsjökull ice cap (and its sibling glaciers) currently borrows the **lake / water-blob** region vocabulary — the §07 big pale mass reads acceptably as a glacier, but it is a stand-in: there is no `glacier` region kind, so ice and water share one facet recipe. Whether to add a dedicated `glacier` kind (its own facet recipe, palette, and — if introduced — its own canonical size bound and validator row here) is a Design System call for Jeff; flagged as Open. Until then, ice caps are authored via `.lake` and this compromise is recorded so no one mistakes it for a decided modeling of glaciers.
 
 *Laugavegur Trail* (source: Ferðafélag Íslands). 6 waypoints:
 
@@ -146,12 +149,12 @@ Distances convert km → mi at 1 km = 0.621371 mi (stored in meters via `Distanc
 | 1 | Wayllabamba | 7.46 | 12 |
 | 2 | Warmiwañusca (Dead Woman's Pass) | 11.81 | 19 |
 | 3 | Pacaymayo | 13.67 | 22 |
-| 4 | Chaquicocha (Sayacmarca) | 17.40 | 28 |
+| 4 | Chaquicocha | 17.40 | 28 |
 | 5 | Wiñay Wayna | 23.61 | 38 |
 | 6 | Inti Punku (Sun Gate) | 25.48 | 41 |
 | 7 | Machu Picchu | 26.72 | 43 |
 
-**Pin positions** for both are placeholder pin-and-route layout (distinct, non-colliding, roughly tracking `distanceFromStart`), finalized by Jeff against the chosen background art — exactly the Ember Spire precedent. Provisional seed values are in the PRD; Jeff's finalized values supersede them.
+**Waypoint positions** for both are the authored trek-arc samples described above (map-unit space, normalized for the seed), not placeholder pin-and-route art — superseding the earlier plan for Jeff to finalize pins against a background raster. `SeedData` ships the authored values.
 
 **Waypoint map positions (KAN-7).** `positionX`/`positionY` are image-relative normalized coordinates (0…1, origin top-left). These were all `0` in the shipped seed; KAN-7 seeds real placeholder values so the marker interpolation and pin layout can be verified. Exact values are placeholder art (Jeff finalizes against real backgrounds later); the requirement is only that they are distinct, non-colliding, and roughly track `distanceFromStart` so segment interpolation looks natural.
 
@@ -422,7 +425,7 @@ Waypoints are **template content** (KAN-10) — shared by every instance, carryi
 
 9. **Permission-aware silent no-op, forward-only (inherits KAN-32 Ruling 3).** When not authorized, `enqueue`'s live-settings check drops the request; progress and crossings still record. Nothing is queued, so a later grant never replays a backlog of past-tense "you reached X" nudges. A milestone missed for lack of permission is missed — forward-only from grant, exactly like KAN-14 crossings.
 
-10. **`journey_complete` copy stays consistent with the KAN-7 completion banner.** The banner reads "Journey complete — Wren is resting at [final waypoint]"; the `journey_complete` sheet copy keeps that voice — past tense, the character arriving/resting at the named destination, `{total_miles}` walked — and reads `{character}` from the Ruling-5 seam so the two never diverge. (Ember Spire's sheet stays provisional under KAN-25; don't polish that copy.)
+10. **`journey_complete` copy stays consistent with the KAN-7 completion banner.** The banner reads "Journey complete — Wren is resting at [final waypoint]"; the `journey_complete` sheet copy keeps that voice — past tense, the character arriving/resting at the named destination, `{total_miles}` walked — and reads `{character}` from the Ruling-5 seam so the two never diverge. (Ember Spire is **archived** (KAN-45, 2026-07-16) and no longer seeded, so its sheet is dormant, not live; the KAN-25 "don't polish that copy" caveat applies only if the journey ever returns.)
 
 **Out of scope for Phase 1 (KAN-33):** the `percent_25/50/75` hooks (authored in the sheets but deferred — they fire when percent milestones ship, KAN-37); notification artwork / `artwork_asset` attachments (Phase 2, KAN-39); settings, reminders, quiet hours, and Watch delivery (v2, KAN-34); scroll-to-waypoint / deep-linked camera framing; character selection (`{character}` stays a constant); any new `@Model`, field, or migration; Ember Spire copy polish (KAN-25). No visual design — system-rendered banners; any in-app foreground visual is Jeff's.
 
@@ -432,7 +435,7 @@ The fantasy-journey map is the app's signature surface. **KAN-7 already shipped 
 
 The **visual** style of the terrain — facet recipes, color triads, glyph sizes, the fixed back-to-front draw order — lives in `docs/DESIGN_SYSTEM.md`'s terrain & cartography section (Jeff owns it, and is porting it in parallel). This section owns the **behavior, data, and architecture** underneath that style: how a map is authored, what coordinate space it lives in, how it's drawn, and how the camera moves. Where the two meet they cross-reference; neither restates the other.
 
-Real-world journeys (Around the World, a specific trail) are a *separate* visualization and will use MapKit when built — see the Journey types row. Everything below is the **custom fantasy** renderer. Camera behavior (zoom, pan, framing) should feel consistent across both kinds of journey.
+The faceted renderer below is now the surface for **every mapped journey**, `realWorld` trails included — real trails (Laugavegur, Inca) are authored in this same facet vocabulary from real geography (KAN-43/44), not through a separate map service. Per Justin's standing ruling (Journey 6/7 above), the earlier "`realWorld` → MapKit when built" plan is **dropped for now**; the only surface that isn't faceted is the pin-and-route fallback for a journey with no authoring (today: Around the World, which is themeless and waypointless). Everything below is the **custom faceted** renderer.
 
 **Decided: a map is authored as a short list of REGION records plus a deterministic seed — never as hand-placed glyphs.**
 
@@ -543,10 +546,10 @@ This reinforces the Journey types row — and, unlike the other decisions here, 
 | **Progress anchor** | Built (KAN-6) | Long-running journeys over weeks/months | Querying "today's distance" as the whole metric | Cumulative since `startDate`, always (see above). |
 | **Progress metric** | Built (KAN-6) | — | Deriving distance from steps × stride | `distanceWalkingRunning` only; steps are a display stat. |
 | **Multiple journeys** | Built (KAN-6); split Built (KAN-10, PR #6) | User runs more than one journey, switches between them, keeps a history of completed ones | "There is only one journey, ever" (a singleton); *and* conflating catalog content with a user's run of it | Model as a list. KAN-10 splits this into `JourneyTemplate` (catalog) + `UserJourney` (instance) and replaces `isActive`/`isCompleted` with the `JourneyStatus` enum — see "Journey lifecycle & the catalog/instance split". |
-| **Multiple simultaneous journeys** | Built (KAN-6) | Yes — a user can run several journeys at once (e.g. Ember Spire and Around the World together) | Assuming only one journey can ever be "active" at a time | The delta-based update above: one shared "last processed distance" anchor, applied to every active journey's own accumulated total. |
-| **Fantasy map + marker** | Built (KAN-7; §04 rig marker KAN-9) | Real-world MapKit routes later | "Progress = marker position" baked into progress logic | Map screen *reads* `journey.progress` / waypoint distances and interpolates marker position; it never owns or writes progress. Faceted terrain rendering is a separate Decided layer — see next row. |
+| **Multiple simultaneous journeys** | Built (KAN-6) | Yes — a user can run several journeys at once (e.g. Road to The Windrise Peaks and Around the World together) | Assuming only one journey can ever be "active" at a time | The delta-based update above: one shared "last processed distance" anchor, applied to every active journey's own accumulated total. |
+| **Fantasy map + marker** | Built (KAN-7; §04 rig marker KAN-9) | Faceted terrain for every mapped journey, fantasy and realWorld alike (KAN-16/21/43/44) | "Progress = marker position" baked into progress logic | Map screen *reads* `journey.progress` / waypoint distances and interpolates marker position; it never owns or writes progress. Faceted terrain rendering is a separate Decided layer — see next row. |
 | **Fantasy map rendering (faceted terrain)** | P1–P3 built (KAN-16); P4 in progress (KAN-21) | The signature faceted terrain; zoom/pan; more journeys later | Hand-placing glyphs; fractional-of-screen coordinates for a map larger than the screen; a per-glyph SwiftUI view hierarchy for hundreds of terrain glyphs | Author as region records + a deterministic seed; one logical map-unit space + a single camera transform; a single culled SwiftUI `Canvas` pass for terrain. Builds *around* KAN-7's already-correct distance-driven marker (row above), which it preserves. See "The fantasy map: faceted cartography system". |
-| **Journey types** | Decided | Fantasy illustrated path today; real-world MapKit routes later | Baking "progress = position on my custom image" into the core progress logic | Keep "distance accumulated" and "how that's visualized" as separate concerns. The map screen reads progress; it doesn't own it. |
+| **Journey types** | Decided | Both fantasy and `realWorld` journeys render as authored faceted maps (Justin's KAN-43/44 ruling); the earlier "`realWorld` → MapKit later" plan is dropped for now — its return would be a new decision | Baking "progress = position on my custom image" into the core progress logic | Keep "distance accumulated" and "how that's visualized" as separate concerns. The map screen reads progress; it doesn't own it. `type` drives no rendering branch — authoring existence does. |
 | **Activity data source** | Built (KAN-6) | Cycling, swimming, wheelchair distance, manual entry for offline days | Hardcoding "distance = HealthKit walking/running distance" deep in many places | Wrap HealthKit access in one small "distance provider." Everything else calls that, not HealthKit directly. |
 | **Units** | Built (KAN-6) | Users outside the US expecting km | Hardcoding "miles" into display strings | Store distance in **meters** internally, always. Format for display in one place based on locale. |
 | **Journey content** | Partially built (KAN-6: Ember Spire waypoints seeded; no remote/user content) | New journeys added without an app update; eventually user-created routes | Waypoints hardcoded as Swift literals scattered in view code | Define waypoints as structured data (a small JSON file or SwiftData records), even if bundled locally for now. |

@@ -69,6 +69,8 @@ nonisolated enum NotificationContentProvider {
         "First Journey": "first-journey",
         "Road to The Windrise Peaks": "windrise-peaks",
         "Around the World": "around-the-world",
+        "Laugavegur Trail": "laugavegur",
+        "Inca Trail": "inca-trail",
     ]
 
     // MARK: - Entry point

@@ -1,0 +1,6 @@
+hook,order,waypoint,cumulative_miles,title_template,body_template,artwork_asset,notes
+waypoint_reached,1,Hrafntinnusker,7.46,{character} reached Hrafntinnusker,"Black obsidian fields glint across the high plateau. Álftavatn lies {miles_to_next} ahead.",,
+waypoint_reached,2,Álftavatn,14.91,Álftavatn reached,"The green valley opens to a still lake. Hvanngil waits {miles_to_next} on.",,
+waypoint_reached,3,Hvanngil,17.40,{character} reached Hvanngil,"A sheltered glen between the ridges. From here the black sands begin — {miles_to_next} to Emstrur.",,
+waypoint_reached,4,Emstrur (Botnar),24.23,Emstrur reached,"Across the dark desert to the canyon huts. Þórsmörk's birch woods rise {miles_to_next} beyond.",,
+journey_complete,5,Þórsmörk,34.18,Þórsmörk!,"{character} reaches the birch woods between the glaciers — {total_miles} walked from Landmannalaugar.",,
